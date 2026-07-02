@@ -1,0 +1,23 @@
+ai:
+  openai:
+    api-key: ${AI_OPENAI_API_KEY:sk-placeholder}
+    model: gpt-4
+  anthropic:
+    api-key: ${AI_ANTHROPIC_API_KEY:sk-ant-placeholder}
+  gemini:
+    api-key: ${AI_GEMINI_API_KEY:placeholder}
+  ollama:
+    base-url: http://localhost:11434
+    model: llama3
+  cache:
+    prompt-ttl-hours: 24
+    embedding-ttl-days: 7
+    max-size: 10000
+
+spring:
+  application:
+    name: jobpilot-ai-service
+
+logging:
+  level:
+    com.jobpilot: INFO
