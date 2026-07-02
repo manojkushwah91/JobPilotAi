@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <springProperty name="appName" source="spring.application.name" defaultValue="jobpilot-api"/>
+    <springProperty name="env" source="spring.profiles.active[0]" defaultValue="dev"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{traceId:-}] [%X{userId:-}] - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>{"timestamp":"%d{yyyy-MM-dd'T'HH:mm:ss.SSS'Z'}","level":"%level","logger":"%logger{36}","thread":"%thread","traceId":"%X{traceId:-}","userId":"%X{userId:-}","requestId":"%X{requestId:-}","correlationId":"%X{correlationId:-}","clientIp":"%X{clientIp:-}","message":"%replace(%msg){'"','\"'}","exception":"%replace(%ex){'"','\"'}"}%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ASYNC_CONSOLE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="JSON_CONSOLE"/>
+        <queueSize>1024</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="ASYNC_CONSOLE"/>
+    </root>
+
+    <logger name="com.jobpilot" level="DEBUG" additivity="false">
+        <appender-ref ref="ASYNC_CONSOLE"/>
+    </logger>
+
+    <logger name="org.springframework.security" level="WARN" additivity="false">
+        <appender-ref ref="ASYNC_CONSOLE"/>
+    </logger>
+
+    <logger name="org.hibernate.SQL" level="WARN" additivity="false">
+        <appender-ref ref="ASYNC_CONSOLE"/>
+    </logger>
+
+    <logger name="AUDIT" level="INFO" additivity="false">
+        <appender-ref ref="ASYNC_CONSOLE"/>
+    </logger>
+
+    <springProfile name="dev">
+        <root level="INFO"/>
+        <logger name="com.jobpilot" level="DEBUG"/>
+        <logger name="org.springframework.security" level="DEBUG"/>
+        <logger name="org.hibernate.SQL" level="DEBUG"/>
+    </springProfile>
+
+    <springProfile name="prod">
+        <root level="WARN"/>
+        <logger name="com.jobpilot" level="WARN"/>
+    </springProfile>
+</configuration>

@@ -1,0 +1,65 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 5000
+      max-lifetime: 1800000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc.batch_size: 25
+        order_inserts: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/staging
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      password: ${REDIS_PASSWORD:}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    consumer:
+      group-id: jobpilot-stage
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.jobpilot: INFO
+
+ai:
+  openai:
+    api-key: ${AI_OPENAI_API_KEY}
+  anthropic:
+    api-key: ${AI_ANTHROPIC_API_KEY}
+  gemini:
+    api-key: ${AI_GEMINI_API_KEY}
+  ollama:
+    base-url: ${OLLAMA_BASE_URL:http://ollama:11434}
+
+security:
+  rate-limiting:
+    enabled: true
+    default-limit: 200
+    default-window-seconds: 60
+  cors:
+    allowed-origins: ${CORS_ORIGINS:https://stage.jobpilot.dev}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  tracing:
+    sampling:
+      probability: 0.5

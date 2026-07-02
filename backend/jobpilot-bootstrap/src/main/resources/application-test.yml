@@ -1,0 +1,43 @@
+spring:
+  autoconfigure:
+    exclude:
+      - org.redisson.spring.starter.RedissonAutoConfigurationV2
+  datasource:
+    url: jdbc:h2:mem:jobpilot-test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  flyway:
+    enabled: false
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: jobpilot-test
+      auto-offset-reset: latest
+
+logging:
+  level:
+    com.jobpilot: WARN
+
+jwt:
+  access-token:
+    expiration: 900000
+  refresh-token:
+    expiration: 604800000
+  rsa:
+    public-key: placeholder-dev-key
+    private-key: placeholder-dev-key
+
+management:
+  tracing:
+    sampling:
+      probability: 0.0
