@@ -35,7 +35,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <!-- Framework Versions -->
-        <spring-cloud.version>2023.0.3</spring-cloud.version>
+        <spring-cloud.version>2025.1.2</spring-cloud.version>
         <spring-ai.version>1.0.0-M3</spring-ai.version>
         <springdoc.version>2.6.0</springdoc.version>
 
