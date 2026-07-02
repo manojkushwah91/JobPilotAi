@@ -1,0 +1,251 @@
+version: '3.9'
+
+name: jobpilot-dev
+
+services:
+  # ============================================================
+  # PostgreSQL 16 + pgvector for primary data + vector search
+  # ============================================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: jobpilot-postgres
+    environment:
+      POSTGRES_DB: jobpilot
+      POSTGRES_USER: jobpilot
+      POSTGRES_PASSWORD: jobpilot_dev
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../../database/migrations/dev:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U jobpilot']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jobpilot-net
+
+  # ============================================================
+  # Redis 7 — caching, rate limiting, session store
+  # ============================================================
+  redis:
+    image: redis:7-alpine
+    container_name: jobpilot-redis
+    ports:
+      - '6379:6379'
+    command: >
+      redis-server --maxmemory 2gb --maxmemory-policy allkeys-lru
+                   --loglevel notice
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - jobpilot-net
+
+  # ============================================================
+  # Kafka 3 + Zookeeper — event streaming for cross-context comms
+  # ============================================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.7.0
+    container_name: jobpilot-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - '2181:2181'
+    networks:
+      - jobpilot-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.7.0
+    container_name: jobpilot-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - '9092:9092'
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - jobpilot-net
+
+  # ============================================================
+  # MinIO — S3-compatible storage for resumes, attachments, exports
+  # ============================================================
+  minio:
+    image: minio/minio:latest
+    container_name: jobpilot-minio
+    command: server /data --console-address ':9001'
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    environment:
+      MINIO_ROOT_USER: jobpilot
+      MINIO_ROOT_PASSWORD: jobpilot_dev
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jobpilot-net
+
+  # ============================================================
+  # Ollama — local AI inference (embeddings, small models)
+  # ============================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: jobpilot-ollama
+    ports:
+      - '11434:11434'
+    volumes:
+      - ollama-data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ['CMD', 'ollama', 'list']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - jobpilot-net
+
+  # ============================================================
+  # Prometheus — metrics collection from all services
+  # ============================================================
+  prometheus:
+    image: prom/prometheus:v2.54.0
+    container_name: jobpilot-prometheus
+    ports:
+      - '9090:9090'
+    volumes:
+      - ../../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+    networks:
+      - jobpilot-net
+
+  # ============================================================
+  # Grafana — dashboards for metrics, logs, traces
+  # ============================================================
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: jobpilot-grafana
+    ports:
+      - '3000:3000'
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    volumes:
+      - ../../monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ../../monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    networks:
+      - jobpilot-net
+
+  # ============================================================
+  # Loki — log aggregation (structured JSON logs from all services)
+  # ============================================================
+  loki:
+    image: grafana/loki:3.1.1
+    container_name: jobpilot-loki
+    ports:
+      - '3100:3100'
+    command: -config.file=/etc/loki/loki.yml
+    volumes:
+      - ../../monitoring/loki/loki.yml:/etc/loki/loki.yml
+      - loki-data:/loki
+    networks:
+      - jobpilot-net
+
+  # ============================================================
+  # Tempo — distributed tracing (OpenTelemetry compatible)
+  # ============================================================
+  tempo:
+    image: grafana/tempo:2.5.0
+    container_name: jobpilot-tempo
+    ports:
+      - '3200:3200'   # tempo query
+      - '4317:4317'   # OTLP gRPC
+      - '4318:4318'   # OTLP HTTP
+    command: -config.file=/etc/tempo/tempo.yml
+    volumes:
+      - ../../monitoring/tempo/tempo.yml:/etc/tempo/tempo.yml
+      - tempo-data:/tmp/tempo
+    networks:
+      - jobpilot-net
+
+  # ============================================================
+  # MailHog — email testing (catches all outbound emails)
+  # ============================================================
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: jobpilot-mailhog
+    ports:
+      - '1025:1025'  # SMTP
+      - '8025:8025'  # Web UI
+    networks:
+      - jobpilot-net
+
+  # ============================================================
+  # pgAdmin — database management UI
+  # ============================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: jobpilot-pgadmin
+    ports:
+      - '5050:80'
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@jobpilot.dev
+      PGADMIN_DEFAULT_PASSWORD: admin
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - jobpilot-net
+
+volumes:
+  postgres-data:
+  redis-data:
+  kafka-data:
+  minio-data:
+  ollama-data:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+  tempo-data:
+  pgadmin-data:
+
+networks:
+  jobpilot-net:
+    name: jobpilot-network
+    driver: bridge
