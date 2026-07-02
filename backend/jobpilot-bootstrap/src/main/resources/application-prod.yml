@@ -1,0 +1,109 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 10
+      idle-timeout: 300000
+      connection-timeout: 5000
+      max-lifetime: 1800000
+      validation-timeout: 3000
+      leak-detection-threshold: 60000
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc.batch_size: 50
+        order_inserts: true
+        order_updates: true
+        jdbc.fetch_size: 200
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/prod
+    baseline-on-migrate: true
+    out-of-order: true
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      password: ${REDIS_PASSWORD}
+      cluster:
+        nodes: ${REDIS_CLUSTER_NODES:}
+      ssl:
+        enabled: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    consumer:
+      group-id: jobpilot-prod
+      auto-offset-reset: latest
+      properties:
+        max.poll.interval.ms: 300000
+    producer:
+      acks: all
+      retries: 3
+    listener:
+      concurrency: 3
+
+server:
+  port: 8080
+  compression:
+    enabled: true
+    mime-types: application/json,application/javascript,text/css
+    min-response-size: 2048
+
+logging:
+  level:
+    com.jobpilot: WARN
+    org.springframework.security: WARN
+    org.springframework.web: WARN
+
+ai:
+  openai:
+    api-key: ${AI_OPENAI_API_KEY}
+    model: gpt-4-turbo
+  anthropic:
+    api-key: ${AI_ANTHROPIC_API_KEY}
+  gemini:
+    api-key: ${AI_GEMINI_API_KEY}
+  ollama:
+    base-url: ${OLLAMA_BASE_URL}
+
+security:
+  rate-limiting:
+    enabled: true
+    default-limit: 100
+    default-window-seconds: 60
+  cors:
+    allowed-origins: ${CORS_ORIGINS:https://app.jobpilot.dev}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  tracing:
+    sampling:
+      probability: 0.1
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: jobpilot-api
+      environment: prod
+
+opentelemetry:
+  exporter:
+    otlp:
+      endpoint: ${OTLP_ENDPOINT:http://tempo:4317}
+  traces:
+    sampler: parentbased_always_on

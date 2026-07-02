@@ -1,0 +1,66 @@
+name: Build
+
+on:
+  push:
+    branches: [main, develop]
+    paths: ['backend/**', 'pom.xml']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: jobpilot-test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports: ['5432:5432']
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Validate
+        run: mvn validate -B -f backend/pom.xml
+
+      - name: Compile
+        run: mvn compile -B -f backend/pom.xml
+
+      - name: Unit Tests
+        run: mvn test -B -f backend/pom.xml
+
+      - name: Integration Tests
+        run: mvn verify -B -f backend/pom.xml -Pintegration
+
+      - name: Quality Gate
+        run: |
+          mvn checkstyle:check -B -f backend/pom.xml
+          mvn pmd:check -B -f backend/pom.xml
+          mvn spotbugs:check -B -f backend/pom.xml
+
+      - name: JaCoCo Report
+        run: mvn jacoco:report -B -f backend/pom.xml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: backend/**/target/site/jacoco/
+
+      - name: Package
+        run: mvn package -DskipTests -B -f backend/pom.xml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-jar
+          path: backend/jobpilot-bootstrap/target/*.jar
