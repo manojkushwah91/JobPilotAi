@@ -65,7 +65,7 @@
         <maven-checkstyle-plugin.version>3.5.0</maven-checkstyle-plugin.version>
         <spotbugs-maven-plugin.version>4.8.6.2</spotbugs-maven-plugin.version>
         <maven-pmd-plugin.version>3.24.0</maven-pmd-plugin.version>
-        <versions-maven-plugin.version>2.17.0</versions-maven-plugin.version>
+        <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
     </properties>
 
     <!-- Platform BOMs — single source of truth for all dependency versions -->
