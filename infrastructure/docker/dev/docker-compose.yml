@@ -13,9 +13,10 @@ services:
       POSTGRES_DB: jobpilot
       POSTGRES_USER: jobpilot
       POSTGRES_PASSWORD: jobpilot_dev
+      POSTGRES_HOST_AUTH_METHOD: trust
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - '5432:5432'
+      - '5433:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ../../database/migrations/dev:/docker-entrypoint-initdb.d

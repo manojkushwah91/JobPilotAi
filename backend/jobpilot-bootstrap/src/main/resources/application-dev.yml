@@ -1,6 +1,10 @@
 spring:
+  cache:
+    type: simple
+  autoconfigure:
+    exclude: org.redisson.spring.starter.RedissonAutoConfigurationV2
   datasource:
-    url: jdbc:postgresql://localhost:5432/jobpilot
+    url: jdbc:postgresql://localhost:5433/jobpilot
     username: jobpilot
     password: jobpilot_dev
     hikari:
@@ -11,7 +15,7 @@ spring:
   jpa:
     show-sql: true
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     properties:
       hibernate:
         format_sql: true
@@ -65,7 +69,7 @@ ai:
     api-key: ${AI_GEMINI_API_KEY:placeholder}
   ollama:
     base-url: http://localhost:11434
-    model: llama3
+    model: llama3.2
   cache:
     prompt-ttl-hours: 24
     embedding-ttl-days: 7
@@ -77,8 +81,8 @@ jwt:
   refresh-token:
     expiration: 604800000 # 7 days
   rsa:
-    public-key: classpath:keys/public.pem
-    private-key: classpath:keys/private.pem
+    public-key: dev-placeholder
+    private-key: dev-placeholder
 
 security:
   rate-limiting:
