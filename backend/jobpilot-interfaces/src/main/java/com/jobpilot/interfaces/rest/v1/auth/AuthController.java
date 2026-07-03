@@ -7,6 +7,9 @@ import com.jobpilot.application.identity.dto.LogoutCommand;
 import com.jobpilot.application.identity.dto.OAuthCommand;
 import com.jobpilot.application.identity.dto.RefreshTokenCommand;
 import com.jobpilot.application.identity.dto.RegisterUserCommand;
+import com.jobpilot.application.identity.ports.EmailVerificationTokenRepository;
+import com.jobpilot.application.identity.ports.PasswordEncoder;
+import com.jobpilot.application.identity.ports.PasswordResetTokenRepository;
 import com.jobpilot.application.identity.ports.UserRepository;
 import com.jobpilot.application.identity.service.OAuthService;
 import com.jobpilot.application.identity.usecase.AuthenticateUserUseCase;
@@ -43,6 +46,9 @@ public class AuthController {
     private final UserRepository userRepository;
     private final EmailSenderPort emailSender;
     private final OAuthService oauthService;
+    private final EmailVerificationTokenRepository emailVerificationTokenRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public AuthController(RegisterUserUseCase registerUserUseCase,
                           AuthenticateUserUseCase authenticateUserUseCase,
@@ -51,7 +57,10 @@ public class AuthController {
                           ChangePasswordUseCase changePasswordUseCase,
                           UserRepository userRepository,
                           EmailSenderPort emailSender,
-                          OAuthService oauthService) {
+                          OAuthService oauthService,
+                          EmailVerificationTokenRepository emailVerificationTokenRepository,
+                          PasswordResetTokenRepository passwordResetTokenRepository,
+                          PasswordEncoder passwordEncoder) {
         this.registerUserUseCase = registerUserUseCase;
         this.authenticateUserUseCase = authenticateUserUseCase;
         this.refreshTokenUseCase = refreshTokenUseCase;
@@ -60,6 +69,9 @@ public class AuthController {
         this.userRepository = userRepository;
         this.emailSender = emailSender;
         this.oauthService = oauthService;
+        this.emailVerificationTokenRepository = emailVerificationTokenRepository;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @RateLimited(capacity = 10)
@@ -112,10 +124,13 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         var userOpt = userRepository.findByEmail(com.jobpilot.domain.identity.Email.from(request.email()));
         if (userOpt.isPresent()) {
-            var resetToken = UUID.randomUUID().toString();
+            var user = userOpt.get();
+            var token = UUID.randomUUID().toString();
+            var resetToken = com.jobpilot.domain.identity.PasswordResetToken.create(user.userId().value(), token, java.time.Duration.ofHours(1));
+            passwordResetTokenRepository.save(resetToken);
             emailSender.sendWithTemplate(request.email(), "password-reset", Map.of(
-                "name", userOpt.get().email().value().split("@")[0],
-                "resetLink", "http://localhost:3000/reset-password?token=" + resetToken
+                "name", user.email().value().split("@")[0],
+                "resetLink", "http://localhost:3000/reset-password?token=" + token
             ));
         }
         return ResponseEntity.ok(ApiResponse.ok(null));
@@ -124,6 +139,50 @@ public class AuthController {
     @RateLimited(capacity = 5)
     @PostMapping("/reset-password")
     public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        var tokenOpt = passwordResetTokenRepository.findByToken(request.token());
+        if (tokenOpt.isEmpty()) {
+            throw new com.jobpilot.common.exception.NotFoundException("PasswordResetToken", request.token());
+        }
+        var resetToken = tokenOpt.get();
+        if (!resetToken.isValid()) {
+            throw new com.jobpilot.common.exception.ValidationException("token", "Token expired or already used");
+        }
+        if (!request.newPassword().equals(request.confirmNewPassword())) {
+            throw new com.jobpilot.common.exception.ValidationException("confirmNewPassword", "Passwords do not match");
+        }
+        var userOpt = userRepository.findById(com.jobpilot.domain.identity.UserId.from(resetToken.userId()));
+        if (userOpt.isEmpty()) {
+            throw new com.jobpilot.common.exception.NotFoundException("User", resetToken.userId());
+        }
+        var user = userOpt.get();
+        var encodedPassword = passwordEncoder.encode(request.newPassword());
+        user.updatePassword(com.jobpilot.domain.identity.PasswordHash.from(encodedPassword));
+        userRepository.save(user);
+        resetToken.markUsed();
+        passwordResetTokenRepository.save(resetToken);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @RateLimited(capacity = 10)
+    @GetMapping("/verify-email")
+    public ResponseEntity<ApiResponse<Void>> verifyEmail(@RequestParam String token) {
+        var tokenOpt = emailVerificationTokenRepository.findByToken(token);
+        if (tokenOpt.isEmpty()) {
+            throw new com.jobpilot.common.exception.NotFoundException("EmailVerificationToken", token);
+        }
+        var verificationToken = tokenOpt.get();
+        if (!verificationToken.isValid()) {
+            throw new com.jobpilot.common.exception.ValidationException("token", "Token expired or already used");
+        }
+        var userOpt = userRepository.findById(com.jobpilot.domain.identity.UserId.from(verificationToken.userId()));
+        if (userOpt.isEmpty()) {
+            throw new com.jobpilot.common.exception.NotFoundException("User", verificationToken.userId());
+        }
+        var user = userOpt.get();
+        user.verifyEmail();
+        userRepository.save(user);
+        verificationToken.markUsed();
+        emailVerificationTokenRepository.save(verificationToken);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
 

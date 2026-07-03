@@ -4,6 +4,7 @@ import com.jobpilot.application.identity.ports.UserRepository;
 import com.jobpilot.domain.identity.Email;
 import com.jobpilot.domain.identity.User;
 import com.jobpilot.domain.identity.UserId;
+import com.jobpilot.infrastructure.event.DomainEventPublishingRepositoryDecorator;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -12,16 +13,21 @@ import java.util.Optional;
 public class UserRepositoryImpl implements UserRepository {
 
     private final UserJpaRepository jpaRepository;
+    private final DomainEventPublishingRepositoryDecorator eventDecorator;
 
-    public UserRepositoryImpl(UserJpaRepository jpaRepository) {
+    public UserRepositoryImpl(UserJpaRepository jpaRepository,
+                              DomainEventPublishingRepositoryDecorator eventDecorator) {
         this.jpaRepository = jpaRepository;
+        this.eventDecorator = eventDecorator;
     }
 
     @Override
     public User save(User user) {
-        var entity = UserEntity.fromDomain(user);
-        var saved = jpaRepository.save(entity);
-        return saved.toDomain();
+        return eventDecorator.publishEvents(user, () -> {
+            var entity = UserEntity.fromDomain(user);
+            var saved = jpaRepository.save(entity);
+            return saved.toDomain();
+        });
     }
 
     @Override

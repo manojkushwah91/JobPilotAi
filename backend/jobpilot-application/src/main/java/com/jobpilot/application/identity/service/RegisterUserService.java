@@ -2,9 +2,11 @@ package com.jobpilot.application.identity.service;
 
 import com.jobpilot.application.identity.dto.AuthResponse;
 import com.jobpilot.application.identity.dto.RegisterUserCommand;
+import com.jobpilot.application.identity.ports.EmailVerificationTokenRepository;
 import com.jobpilot.application.identity.ports.PasswordEncoder;
 import com.jobpilot.application.identity.ports.TokenProvider;
 import com.jobpilot.application.identity.ports.UserRepository;
+import com.jobpilot.application.notification.ports.EmailSenderPort;
 import com.jobpilot.application.identity.usecase.RegisterUserUseCase;
 import com.jobpilot.common.exception.DuplicateException;
 import com.jobpilot.domain.identity.Email;
@@ -13,7 +15,11 @@ import com.jobpilot.domain.identity.User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.jobpilot.domain.identity.EmailVerificationToken;
+import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @Service
 @Transactional
@@ -22,13 +28,19 @@ public class RegisterUserService implements RegisterUserUseCase {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenProvider tokenProvider;
+    private final EmailVerificationTokenRepository emailVerificationTokenRepository;
+    private final EmailSenderPort emailSender;
 
     public RegisterUserService(UserRepository userRepository,
                                 PasswordEncoder passwordEncoder,
-                                TokenProvider tokenProvider) {
+                                TokenProvider tokenProvider,
+                                EmailVerificationTokenRepository emailVerificationTokenRepository,
+                                EmailSenderPort emailSender) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenProvider = tokenProvider;
+        this.emailVerificationTokenRepository = emailVerificationTokenRepository;
+        this.emailSender = emailSender;
     }
 
     @Override
@@ -43,6 +55,14 @@ public class RegisterUserService implements RegisterUserUseCase {
         var user = User.register(email, passwordHash);
 
         userRepository.save(user);
+
+        var token = UUID.randomUUID().toString();
+        var verificationToken = EmailVerificationToken.create(user.userId().value(), token, Duration.ofHours(24));
+        emailVerificationTokenRepository.save(verificationToken);
+        emailSender.sendWithTemplate(user.email().value(), "verify-email", Map.of(
+            "name", user.email().value().split("@")[0],
+            "verifyLink", "http://localhost:3000/verify-email?token=" + token
+        ));
 
         var accessToken = tokenProvider.generateAccessToken(
             user.userId().value().toString(),

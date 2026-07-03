@@ -2,7 +2,9 @@ package com.jobpilot.interfaces.rest.v1.notification;
 
 import com.jobpilot.application.notification.dto.*;
 import com.jobpilot.application.notification.usecase.*;
+import com.jobpilot.common.exception.UnauthorizedException;
 import com.jobpilot.common.model.ApiResponse;
+import com.jobpilot.infrastructure.security.JwtPrincipal;
 import com.jobpilot.interfaces.rest.annotation.RateLimited;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -10,6 +12,7 @@ import jakarta.validation.constraints.NotNull;
 import com.jobpilot.domain.notification.NotificationChannel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -42,8 +45,11 @@ public class NotificationController {
 
     @RateLimited(capacity = 100)
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<NotificationResponse>> getById(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<NotificationResponse>> getById(
+            @PathVariable String id,
+            @AuthenticationPrincipal JwtPrincipal principal) {
         var response = getNotificationUseCase.execute(new GetNotificationCommand(id));
+        if (!response.userId().equals(UUID.fromString(principal.userId()))) throw new UnauthorizedException("Access denied");
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 

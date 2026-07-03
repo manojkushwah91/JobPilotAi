@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: tokens } = await apiPost<AuthTokens>(API.auth.login, credentials);
     localStorage.setItem('accessToken', tokens.accessToken);
     localStorage.setItem('refreshToken', tokens.refreshToken);
-    const { data: userData } = await apiPost<User>('/auth/me');
+    const { data: userData } = await apiPost<User>('/users/me');
     setUser(userData);
     router.push('/dashboard');
   }, [router, setUser]);
@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: tokens } = await apiPost<AuthTokens>(API.auth.register, data);
     localStorage.setItem('accessToken', tokens.accessToken);
     localStorage.setItem('refreshToken', tokens.refreshToken);
-    const { data: userData } = await apiPost<User>('/auth/me');
+    const { data: userData } = await apiPost<User>('/users/me');
     setUser(userData);
     router.push('/dashboard');
   }, [router, setUser]);

@@ -7,9 +7,11 @@ import com.jobpilot.application.billing.ports.SubscriptionRepository;
 import com.jobpilot.application.billing.usecase.CancelSubscriptionUseCase;
 import com.jobpilot.application.billing.usecase.StartSubscriptionUseCase;
 import com.jobpilot.common.model.ApiResponse;
+import com.jobpilot.infrastructure.security.JwtPrincipal;
 import com.jobpilot.interfaces.rest.annotation.RateLimited;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -32,8 +34,11 @@ public class BillingController {
 
     @RateLimited(capacity = 100)
     @PostMapping("/subscriptions")
-    public ResponseEntity<ApiResponse<SubscriptionResponse>> create(@RequestBody StartSubscriptionRequest request) {
-        var command = new StartSubscriptionCommand(request.userId(), request.plan());
+    public ResponseEntity<ApiResponse<SubscriptionResponse>> create(
+            @RequestBody StartSubscriptionRequest request,
+            @AuthenticationPrincipal JwtPrincipal principal) {
+        var userId = UUID.fromString(principal.userId());
+        var command = new StartSubscriptionCommand(userId, request.plan());
         var response = startSubscriptionUseCase.execute(command);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(response));
     }
@@ -54,5 +59,5 @@ public class BillingController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
-    public record StartSubscriptionRequest(UUID userId, com.jobpilot.domain.billing.SubscriptionPlan plan) {}
+    public record StartSubscriptionRequest(com.jobpilot.domain.billing.SubscriptionPlan plan) {}
 }

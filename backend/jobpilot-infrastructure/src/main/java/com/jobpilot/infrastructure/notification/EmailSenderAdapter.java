@@ -60,6 +60,7 @@ public class EmailSenderAdapter implements EmailSenderPort {
 
     private String resolveSubject(String templateName, Map<String, Object> variables) {
         if ("welcome".equals(templateName)) return "Welcome to JobPilot AI!";
+        if ("verify-email".equals(templateName)) return "Verify Your JobPilot Email";
         if ("password-reset".equals(templateName)) return "Reset Your JobPilot Password";
         if ("application-status".equals(templateName)) return "Application Status Update";
         if ("interview-feedback".equals(templateName)) return "Interview Feedback Ready";

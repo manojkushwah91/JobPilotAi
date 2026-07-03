@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
@@ -13,6 +12,10 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U jobpilot"]
       interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - jobpilot-net
 
   redis:
     image: redis:7-alpine
@@ -22,9 +25,16 @@ services:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - jobpilot-net
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     environment:
@@ -33,23 +43,56 @@ services:
       DB_USERNAME: jobpilot
       DB_PASSWORD: ${DB_PASSWORD:-jobpilot_prod}
       REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
       AI_OPENAI_API_KEY: ${AI_OPENAI_API_KEY:-}
+      AI_ANTHROPIC_API_KEY: ${AI_ANTHROPIC_API_KEY:-}
+      AI_GEMINI_API_KEY: ${AI_GEMINI_API_KEY:-}
+      OLLAMA_BASE_URL: http://ollama:11434
+      JWT_RSA_PRIVATE_KEY: ${JWT_RSA_PRIVATE_KEY:-}
+      JWT_RSA_PUBLIC_KEY: ${JWT_RSA_PUBLIC_KEY:-}
+      CORS_ORIGINS: http://localhost:3000,https://app.jobpilot.dev
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+      OTLP_ENDPOINT: http://tempo:4317
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -qO- http://localhost:8080/actuator/health/liveness || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - jobpilot-net
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
+      NEXT_PUBLIC_WS_URL: ws://localhost:8080/ws
+      NEXT_PUBLIC_AUTH_REDIRECT: http://localhost:3000/auth/callback
+      NEXT_PUBLIC_ENABLE_AI: "true"
+      NEXT_PUBLIC_ENABLE_AUTOMATION: "true"
     depends_on:
-      - backend
+      backend:
+        condition: service_started
+    networks:
+      - jobpilot-net
 
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  jobpilot-net:
+    name: jobpilot-network
+    driver: bridge

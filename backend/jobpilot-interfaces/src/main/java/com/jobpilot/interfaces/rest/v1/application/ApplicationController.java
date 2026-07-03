@@ -2,6 +2,7 @@ package com.jobpilot.interfaces.rest.v1.application;
 
 import com.jobpilot.application.application.dto.*;
 import com.jobpilot.application.application.usecase.*;
+import com.jobpilot.common.exception.UnauthorizedException;
 import com.jobpilot.common.model.ApiResponse;
 import com.jobpilot.infrastructure.security.JwtPrincipal;
 import com.jobpilot.interfaces.rest.annotation.RateLimited;
@@ -54,8 +55,11 @@ public class ApplicationController {
 
     @RateLimited(capacity = 100)
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ApplicationResponse>> getById(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<ApplicationResponse>> getById(
+            @PathVariable String id,
+            @AuthenticationPrincipal JwtPrincipal principal) {
         var response = getApplicationUseCase.execute(new GetApplicationCommand(id));
+        if (!response.userId().equals(principal.userId())) throw new UnauthorizedException("Access denied");
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
@@ -63,15 +67,21 @@ public class ApplicationController {
     @PatchMapping("/{id}/status")
     public ResponseEntity<ApiResponse<ApplicationResponse>> updateStatus(
             @PathVariable String id,
-            @RequestBody UpdateStatusRequest request) {
+            @RequestBody UpdateStatusRequest request,
+            @AuthenticationPrincipal JwtPrincipal principal) {
         var response = updateApplicationStatusUseCase.execute(
             new UpdateApplicationStatusCommand(id, request.status()));
+        if (!response.userId().equals(principal.userId())) throw new UnauthorizedException("Access denied");
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @RateLimited(capacity = 100)
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<Void>> delete(
+            @PathVariable String id,
+            @AuthenticationPrincipal JwtPrincipal principal) {
+        var response = getApplicationUseCase.execute(new GetApplicationCommand(id));
+        if (!response.userId().equals(principal.userId())) throw new UnauthorizedException("Access denied");
         deleteApplicationUseCase.execute(new DeleteApplicationCommand(id));
         return ResponseEntity.ok(ApiResponse.ok(null));
     }

@@ -30,7 +30,7 @@ spring:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT:6379}
       timeout: 2000ms
-      password: ${REDIS_PASSWORD}
+      password: ${REDIS_PASSWORD:}
       cluster:
         nodes: ${REDIS_CLUSTER_NODES:}
       ssl:
