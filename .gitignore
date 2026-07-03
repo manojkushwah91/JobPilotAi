@@ -61,7 +61,7 @@ monitoring/prometheus/data/
 
 # Uploads
 uploads/
-storage/
+/storage/
 
 # TypeScript
 *.tsbuildinfo

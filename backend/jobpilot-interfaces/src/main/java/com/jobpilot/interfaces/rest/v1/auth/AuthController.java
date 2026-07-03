@@ -4,9 +4,11 @@ import com.jobpilot.application.identity.dto.AuthenticateCommand;
 import com.jobpilot.application.identity.dto.AuthResponse;
 import com.jobpilot.application.identity.dto.ChangePasswordCommand;
 import com.jobpilot.application.identity.dto.LogoutCommand;
+import com.jobpilot.application.identity.dto.OAuthCommand;
 import com.jobpilot.application.identity.dto.RefreshTokenCommand;
 import com.jobpilot.application.identity.dto.RegisterUserCommand;
 import com.jobpilot.application.identity.ports.UserRepository;
+import com.jobpilot.application.identity.service.OAuthService;
 import com.jobpilot.application.identity.usecase.AuthenticateUserUseCase;
 import com.jobpilot.application.identity.usecase.ChangePasswordUseCase;
 import com.jobpilot.application.identity.usecase.LogoutUseCase;
@@ -20,13 +22,11 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 import java.util.UUID;
@@ -42,6 +42,7 @@ public class AuthController {
     private final ChangePasswordUseCase changePasswordUseCase;
     private final UserRepository userRepository;
     private final EmailSenderPort emailSender;
+    private final OAuthService oauthService;
 
     public AuthController(RegisterUserUseCase registerUserUseCase,
                           AuthenticateUserUseCase authenticateUserUseCase,
@@ -49,7 +50,8 @@ public class AuthController {
                           LogoutUseCase logoutUseCase,
                           ChangePasswordUseCase changePasswordUseCase,
                           UserRepository userRepository,
-                          EmailSenderPort emailSender) {
+                          EmailSenderPort emailSender,
+                          OAuthService oauthService) {
         this.registerUserUseCase = registerUserUseCase;
         this.authenticateUserUseCase = authenticateUserUseCase;
         this.refreshTokenUseCase = refreshTokenUseCase;
@@ -57,6 +59,7 @@ public class AuthController {
         this.changePasswordUseCase = changePasswordUseCase;
         this.userRepository = userRepository;
         this.emailSender = emailSender;
+        this.oauthService = oauthService;
     }
 
     @RateLimited(capacity = 10)
@@ -122,6 +125,23 @@ public class AuthController {
     @PostMapping("/reset-password")
     public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @GetMapping("/oauth/{provider}")
+    public ResponseEntity<Void> initiateOAuth(@PathVariable String provider) {
+        var authUrl = oauthService.initiateOAuth(provider);
+        return ResponseEntity.status(HttpStatus.FOUND)
+            .header(HttpHeaders.LOCATION, authUrl)
+            .build();
+    }
+
+    @PostMapping("/oauth/{provider}/callback")
+    public ResponseEntity<ApiResponse<AuthResponse>> handleOAuthCallback(
+            @PathVariable String provider,
+            @RequestParam String code,
+            @RequestParam(defaultValue = "http://localhost:3000/auth/callback") String redirectUri) {
+        var response = oauthService.handleOAuthCallback(new OAuthCommand(provider, code, redirectUri));
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     public record RegisterRequest(
