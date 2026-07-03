@@ -6,11 +6,13 @@ import com.jobpilot.application.identity.dto.ChangePasswordCommand;
 import com.jobpilot.application.identity.dto.LogoutCommand;
 import com.jobpilot.application.identity.dto.RefreshTokenCommand;
 import com.jobpilot.application.identity.dto.RegisterUserCommand;
+import com.jobpilot.application.identity.ports.UserRepository;
 import com.jobpilot.application.identity.usecase.AuthenticateUserUseCase;
 import com.jobpilot.application.identity.usecase.ChangePasswordUseCase;
 import com.jobpilot.application.identity.usecase.LogoutUseCase;
 import com.jobpilot.application.identity.usecase.RefreshTokenUseCase;
 import com.jobpilot.application.identity.usecase.RegisterUserUseCase;
+import com.jobpilot.application.notification.ports.EmailSenderPort;
 import com.jobpilot.common.model.ApiResponse;
 import com.jobpilot.infrastructure.security.JwtPrincipal;
 import com.jobpilot.interfaces.rest.annotation.RateLimited;
@@ -26,6 +28,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -35,17 +40,23 @@ public class AuthController {
     private final RefreshTokenUseCase refreshTokenUseCase;
     private final LogoutUseCase logoutUseCase;
     private final ChangePasswordUseCase changePasswordUseCase;
+    private final UserRepository userRepository;
+    private final EmailSenderPort emailSender;
 
     public AuthController(RegisterUserUseCase registerUserUseCase,
                           AuthenticateUserUseCase authenticateUserUseCase,
                           RefreshTokenUseCase refreshTokenUseCase,
                           LogoutUseCase logoutUseCase,
-                          ChangePasswordUseCase changePasswordUseCase) {
+                          ChangePasswordUseCase changePasswordUseCase,
+                          UserRepository userRepository,
+                          EmailSenderPort emailSender) {
         this.registerUserUseCase = registerUserUseCase;
         this.authenticateUserUseCase = authenticateUserUseCase;
         this.refreshTokenUseCase = refreshTokenUseCase;
         this.logoutUseCase = logoutUseCase;
         this.changePasswordUseCase = changePasswordUseCase;
+        this.userRepository = userRepository;
+        this.emailSender = emailSender;
     }
 
     @RateLimited(capacity = 10)
@@ -93,6 +104,26 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
 
+    @RateLimited(capacity = 5)
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        var userOpt = userRepository.findByEmail(com.jobpilot.domain.identity.Email.from(request.email()));
+        if (userOpt.isPresent()) {
+            var resetToken = UUID.randomUUID().toString();
+            emailSender.sendWithTemplate(request.email(), "password-reset", Map.of(
+                "name", userOpt.get().email().value().split("@")[0],
+                "resetLink", "http://localhost:3000/reset-password?token=" + resetToken
+            ));
+        }
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @RateLimited(capacity = 5)
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
     public record RegisterRequest(
         @NotBlank @Email @Size(max = 255) String email,
         @NotBlank @Size(min = 12, max = 128) String password,
@@ -115,6 +146,16 @@ public class AuthController {
 
     public record ChangePasswordRequest(
         @NotBlank String currentPassword,
+        @NotBlank @Size(min = 12, max = 128) String newPassword,
+        @NotBlank String confirmNewPassword
+    ) {}
+
+    public record ForgotPasswordRequest(
+        @NotBlank @Email String email
+    ) {}
+
+    public record ResetPasswordRequest(
+        @NotBlank String token,
         @NotBlank @Size(min = 12, max = 128) String newPassword,
         @NotBlank String confirmNewPassword
     ) {}

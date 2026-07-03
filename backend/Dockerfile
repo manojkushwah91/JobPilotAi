@@ -12,7 +12,12 @@ COPY . .
 RUN mvn package -DskipTests -B
 
 FROM eclipse-temurin:21-jre AS runtime
+RUN groupadd -r jobpilot && useradd -r -g jobpilot -d /app -s /sbin/nologin jobpilot
 WORKDIR /app
 COPY --from=build /app/jobpilot-bootstrap/target/*.jar app.jar
+RUN chown -R jobpilot:jobpilot /app
+USER jobpilot
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD curl -f http://localhost:8080/actuator/health/liveness || exit 1
 ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Node
+node_modules
+npm-debug.log
+.next
+
+# Java
+target
+*.class
+*.jar
+*.war
+*.log
+.mvn/timing
+
+# IDE
+.idea
+*.iml
+.vscode
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+*.pem
+
+# Docker
+docker-data
+
+# Test
+coverage
+test-results
+
+# Temp
+tmp
+temp

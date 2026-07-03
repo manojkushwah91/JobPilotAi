@@ -4,6 +4,7 @@ import com.jobpilot.application.user.dto.UpdateProfileCommand;
 import com.jobpilot.application.user.dto.UpdateSettingsCommand;
 import com.jobpilot.application.user.dto.UserProfileResponse;
 import com.jobpilot.application.user.dto.UserSettingsResponse;
+import com.jobpilot.application.user.service.DeleteUserService;
 import com.jobpilot.application.user.service.GetUserProfileService;
 import com.jobpilot.application.user.service.GetUserSettingsService;
 import com.jobpilot.application.user.service.UpdateUserProfileService;
@@ -28,15 +29,18 @@ public class UserController {
     private final UpdateUserProfileService updateUserProfileService;
     private final GetUserSettingsService getUserSettingsService;
     private final UpdateUserSettingsService updateUserSettingsService;
+    private final DeleteUserService deleteUserService;
 
     public UserController(GetUserProfileService getUserProfileService,
                           UpdateUserProfileService updateUserProfileService,
                           GetUserSettingsService getUserSettingsService,
-                          UpdateUserSettingsService updateUserSettingsService) {
+                          UpdateUserSettingsService updateUserSettingsService,
+                          DeleteUserService deleteUserService) {
         this.getUserProfileService = getUserProfileService;
         this.updateUserProfileService = updateUserProfileService;
         this.getUserSettingsService = getUserSettingsService;
         this.updateUserSettingsService = updateUserSettingsService;
+        this.deleteUserService = deleteUserService;
     }
 
     @RateLimited(capacity = 100)
@@ -93,7 +97,8 @@ public class UserController {
     @DeleteMapping("/me")
     public ResponseEntity<ApiResponse<Void>> deleteAccount(
             @AuthenticationPrincipal JwtPrincipal principal) {
-        // soft delete – delegated to service
+        var userId = UUID.fromString(principal.userId());
+        deleteUserService.execute(userId);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
 
