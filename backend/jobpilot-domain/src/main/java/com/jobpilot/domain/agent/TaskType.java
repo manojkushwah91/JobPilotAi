@@ -1,0 +1,16 @@
+package com.jobpilot.domain.agent;
+
+public enum TaskType {
+    DISCOVER_JOBS,
+    ANALYZE_JOB,
+    RANK_JOB,
+    TAILOR_RESUME,
+    GENERATE_COVER_LETTER,
+    SUBMIT_APPLICATION,
+    TAKE_SCREENSHOT,
+    SEND_NOTIFICATION,
+    UPDATE_MEMORY,
+    OBSERVE_RESULTS,
+    PLAN_NEXT_ACTION,
+    VERIFY_APPLICATION
+}

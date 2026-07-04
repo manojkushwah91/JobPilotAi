@@ -1,0 +1,16 @@
+package com.jobpilot.domain.agent;
+
+public enum DecisionType {
+    APPLY_TO_JOB,
+    SKIP_JOB,
+    REJECT_JOB,
+    TAILOR_RESUME,
+    GENERATE_COVER_LETTER,
+    PAUSE_MISSION,
+    RESUME_MISSION,
+    INCREASE_PRIORITY,
+    DECREASE_PRIORITY,
+    REQUEST_APPROVAL,
+    LEARN_PREFERENCE,
+    UPDATE_STRATEGY
+}
