@@ -11,7 +11,7 @@ public class AgentMemory extends BaseAggregateRoot {
     private MemoryId memoryId;
     private UUID userId;
     private MemoryType memoryType;
-    private String key;
+    private String memoryKey;
     private String value;
     private Map<String, Object> metadata;
     private double confidence;
@@ -21,12 +21,12 @@ public class AgentMemory extends BaseAggregateRoot {
     private Instant createdAt;
     private Instant updatedAt;
 
-    private AgentMemory(MemoryId memoryId, UUID userId, MemoryType memoryType, String key, String value) {
+    private AgentMemory(MemoryId memoryId, UUID userId, MemoryType memoryType, String memoryKey, String value) {
         super(memoryId.value());
         this.memoryId = memoryId;
         this.userId = userId;
         this.memoryType = memoryType;
-        this.key = key;
+        this.memoryKey = memoryKey;
         this.value = value;
         this.confidence = 1.0;
         this.accessCount = 0;
@@ -35,15 +35,15 @@ public class AgentMemory extends BaseAggregateRoot {
         this.updatedAt = Instant.now();
     }
 
-    public static AgentMemory create(UUID userId, MemoryType memoryType, String key, String value) {
-        return new AgentMemory(MemoryId.generate(), userId, memoryType, key, value);
+    public static AgentMemory create(UUID userId, MemoryType memoryType, String memoryKey, String value) {
+        return new AgentMemory(MemoryId.generate(), userId, memoryType, memoryKey, value);
     }
 
     public static AgentMemory reconstitute(MemoryId memoryId, UUID userId, MemoryType memoryType,
-                                            String key, String value, Map<String, Object> metadata,
+                                            String memoryKey, String value, Map<String, Object> metadata,
                                             double confidence, int accessCount, Instant lastAccessedAt,
                                             boolean active, Instant createdAt, Instant updatedAt) {
-        var m = new AgentMemory(memoryId, userId, memoryType, key, value);
+        var m = new AgentMemory(memoryId, userId, memoryType, memoryKey, value);
         m.metadata = metadata;
         m.confidence = confidence;
         m.accessCount = accessCount;
@@ -83,7 +83,7 @@ public class AgentMemory extends BaseAggregateRoot {
     public MemoryId memoryId() { return memoryId; }
     public UUID userId() { return userId; }
     public MemoryType memoryType() { return memoryType; }
-    public String key() { return key; }
+    public String memoryKey() { return memoryKey; }
     public String value() { return value; }
     public Map<String, Object> metadata() { return metadata; }
     public double confidence() { return confidence; }

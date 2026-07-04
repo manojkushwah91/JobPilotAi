@@ -27,7 +27,16 @@ public class MissionService {
                                   List<String> preferredCompanies, List<String> avoidCompanies,
                                   List<String> preferredSkills, String experienceLevel,
                                   String employmentType, Integer dailyLimit, Integer deadlineDays) {
-        var mission = Mission.create(userId, title, targetRole);
+        var mission = Mission.create(userId, title, targetRole)
+            .withTargetLocation(targetLocation)
+            .withSalaryRange(salaryMin, salaryMax, "INR")
+            .withPreferredCompanies(preferredCompanies)
+            .withAvoidCompanies(avoidCompanies)
+            .withPreferredSkills(preferredSkills)
+            .withExperienceLevel(experienceLevel)
+            .withEmploymentType(employmentType)
+            .withDailyApplicationLimit(dailyLimit)
+            .withDeadlineDays(deadlineDays);
         missionRepository.save(mission);
         log.info("Created mission {} for user {}", mission.missionId(), userId);
         return mission;

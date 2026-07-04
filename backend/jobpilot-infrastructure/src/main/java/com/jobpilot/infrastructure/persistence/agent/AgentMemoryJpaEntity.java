@@ -19,7 +19,7 @@ public class AgentMemoryJpaEntity {
     @Column(name = "memory_type", nullable = false)
     private com.jobpilot.domain.agent.MemoryType memoryType;
 
-    @Column(nullable = false)
+    @Column(name = "memory_key", nullable = false)
     private String key;
 
     @Column(columnDefinition = "text")
@@ -51,7 +51,7 @@ public class AgentMemoryJpaEntity {
         entity.id = memory.memoryId().value();
         entity.userId = memory.userId();
         entity.memoryType = memory.memoryType();
-        entity.key = memory.key();
+        entity.key = memory.memoryKey();
         entity.value = memory.value();
         entity.confidence = memory.confidence();
         entity.accessCount = memory.accessCount();

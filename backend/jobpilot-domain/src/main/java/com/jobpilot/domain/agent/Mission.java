@@ -61,6 +61,62 @@ public class Mission extends BaseAggregateRoot {
         return new Mission(MissionId.generate(), userId, title, targetRole);
     }
 
+    public Mission withTargetLocation(String targetLocation) {
+        this.targetLocation = targetLocation;
+        this.updatedAt = Instant.now();
+        return this;
+    }
+
+    public Mission withSalaryRange(Integer salaryMin, Integer salaryMax, String currency) {
+        this.salaryMin = salaryMin;
+        this.salaryMax = salaryMax;
+        this.currency = currency;
+        this.updatedAt = Instant.now();
+        return this;
+    }
+
+    public Mission withPreferredCompanies(List<String> companies) {
+        this.preferredCompanies = companies != null ? new ArrayList<>(companies) : new ArrayList<>();
+        this.updatedAt = Instant.now();
+        return this;
+    }
+
+    public Mission withAvoidCompanies(List<String> companies) {
+        this.avoidCompanies = companies != null ? new ArrayList<>(companies) : new ArrayList<>();
+        this.updatedAt = Instant.now();
+        return this;
+    }
+
+    public Mission withPreferredSkills(List<String> skills) {
+        this.preferredSkills = skills != null ? new ArrayList<>(skills) : new ArrayList<>();
+        this.updatedAt = Instant.now();
+        return this;
+    }
+
+    public Mission withExperienceLevel(String experienceLevel) {
+        this.experienceLevel = experienceLevel;
+        this.updatedAt = Instant.now();
+        return this;
+    }
+
+    public Mission withEmploymentType(String employmentType) {
+        this.employmentType = employmentType;
+        this.updatedAt = Instant.now();
+        return this;
+    }
+
+    public Mission withDailyApplicationLimit(Integer limit) {
+        this.dailyApplicationLimit = limit;
+        this.updatedAt = Instant.now();
+        return this;
+    }
+
+    public Mission withDeadlineDays(Integer days) {
+        this.deadlineDays = days;
+        this.updatedAt = Instant.now();
+        return this;
+    }
+
     public static Mission reconstitute(MissionId missionId, UUID userId, String title, String targetRole,
                                         String targetLocation, Integer salaryMin, Integer salaryMax, String currency,
                                         List<String> preferredCompanies, List<String> avoidCompanies,

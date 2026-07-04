@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS agent_memories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
     memory_type VARCHAR(50) NOT NULL,
-    key VARCHAR(255) NOT NULL,
+    memory_key VARCHAR(255) NOT NULL,
     value TEXT,
     metadata JSONB,
     confidence DOUBLE PRECISION DEFAULT 1.0,
@@ -104,7 +104,7 @@ CREATE INDEX IF NOT EXISTS idx_agent_tasks_status ON agent_tasks(status);
 CREATE INDEX IF NOT EXISTS idx_agent_tasks_priority ON agent_tasks(priority DESC, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_agent_memories_user_id ON agent_memories(user_id);
 CREATE INDEX IF NOT EXISTS idx_agent_memories_user_type ON agent_memories(user_id, memory_type);
-CREATE INDEX IF NOT EXISTS idx_agent_memories_user_type_key ON agent_memories(user_id, memory_type, key);
+CREATE INDEX IF NOT EXISTS idx_agent_memories_user_type_key ON agent_memories(user_id, memory_type, memory_key);
 CREATE INDEX IF NOT EXISTS idx_agent_observations_mission_id ON agent_observations(mission_id);
 CREATE INDEX IF NOT EXISTS idx_agent_decisions_mission_id ON agent_decisions(mission_id);
 CREATE INDEX IF NOT EXISTS idx_agent_decisions_unexecuted ON agent_decisions(mission_id, executed);

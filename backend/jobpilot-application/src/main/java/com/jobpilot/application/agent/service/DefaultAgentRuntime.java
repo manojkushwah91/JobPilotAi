@@ -222,7 +222,7 @@ public class DefaultAgentRuntime implements AgentRuntime {
 
     @Override
     public void storeMemory(AgentMemory memory) {
-        memoryService.store(memory.userId(), memory.memoryType(), memory.key(), memory.value());
+        memoryService.store(memory.userId(), memory.memoryType(), memory.memoryKey(), memory.value());
     }
 
     @Override

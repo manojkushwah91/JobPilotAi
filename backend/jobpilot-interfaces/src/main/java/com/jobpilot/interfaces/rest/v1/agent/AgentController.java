@@ -1,8 +1,9 @@
 package com.jobpilot.interfaces.rest.v1.agent;
 
+import com.jobpilot.application.agent.service.AgentChatService;
 import com.jobpilot.application.agent.service.AgentTaskService;
 import com.jobpilot.application.agent.service.MissionService;
-import com.jobpilot.domain.agent.Mission;
+import com.jobpilot.domain.agent.MissionStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -20,10 +21,14 @@ public class AgentController {
 
     private final MissionService missionService;
     private final AgentTaskService taskService;
+    private final AgentChatService chatService;
 
-    public AgentController(MissionService missionService, AgentTaskService taskService) {
+    public AgentController(MissionService missionService,
+                           AgentTaskService taskService,
+                           AgentChatService chatService) {
         this.missionService = missionService;
         this.taskService = taskService;
+        this.chatService = chatService;
     }
 
     @PostMapping("/missions")
@@ -108,11 +113,27 @@ public class AgentController {
         return ResponseEntity.ok(TaskResponse.from(task));
     }
 
+    @PostMapping("/chat")
+    public ResponseEntity<ChatResponse> chat(@RequestBody ChatRequest request) {
+        var userId = UUID.fromString(request.userId());
+        var response = chatService.processMessage(userId, request.message());
+        return ResponseEntity.ok(new ChatResponse(response.response(), response.type()));
+    }
+
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> getAgentStatus() {
+        var missions = missionService.getUserMissions(UUID.randomUUID());
+        var activeMissions = missions.stream()
+            .filter(m -> m.status() == MissionStatus.ACTIVE)
+            .count();
+
         return ResponseEntity.ok(Map.of(
-            "status", "running",
-            "version", "2.0.0"
+            "status", activeMissions > 0 ? "running" : "idle",
+            "version", "2.0.0",
+            "activeMissions", activeMissions
         ));
     }
+
+    public record ChatRequest(String userId, String message) {}
+    public record ChatResponse(String response, String type) {}
 }
