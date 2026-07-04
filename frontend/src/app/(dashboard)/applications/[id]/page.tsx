@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { useApiQuery, useApiMutation } from '@/lib/hooks/useQuery';
+import { apiDelete } from '@/lib/api/client';
 import { API } from '@/lib/api/endpoints';
 import type { Application, ApplicationNote, ApplicationStatus } from '@/types';
 import { StatusBadge, STATUS_CONFIG } from '@/components/features/applications/StatusBadge';
@@ -35,6 +37,7 @@ const STATUS_LABELS: Record<ApplicationStatus, string> = {
 };
 
 export default function ApplicationDetailPage() {
+  const queryClient = useQueryClient();
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -69,8 +72,12 @@ export default function ApplicationDetailPage() {
     }
   );
 
-  const deleteNoteMutation = useApiMutation<void, void>('DELETE', '', {
-    onSuccess: () => toast.success('Note deleted'),
+  const deleteNoteMutation = useMutation({
+    mutationFn: (noteId: string) => apiDelete(API.applications.notes(id) + '/' + noteId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['application', id] });
+      toast.success('Note deleted');
+    },
     onError: () => toast.error('Failed to delete note'),
   });
 
@@ -164,7 +171,7 @@ export default function ApplicationDetailPage() {
                     <ApplicationNoteCard
                       key={note.id}
                       note={note}
-                      onDelete={(nid) => deleteNoteMutation.mutate()}
+                      onDelete={(nid) => deleteNoteMutation.mutate(nid)}
                     />
                   ))
                 ) : (

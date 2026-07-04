@@ -4,7 +4,7 @@ spring:
   autoconfigure:
     exclude: org.redisson.spring.starter.RedissonAutoConfigurationV2
   datasource:
-    url: jdbc:postgresql://localhost:5433/jobpilot
+    url: jdbc:postgresql://localhost:5432/jobpilot
     username: jobpilot
     password: jobpilot_dev
     hikari:

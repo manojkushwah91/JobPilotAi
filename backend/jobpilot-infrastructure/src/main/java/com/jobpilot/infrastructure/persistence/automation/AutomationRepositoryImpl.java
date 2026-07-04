@@ -3,10 +3,12 @@ package com.jobpilot.infrastructure.persistence.automation;
 import com.jobpilot.application.automation.ports.AutomationRepository;
 import com.jobpilot.domain.automation.AutomationSession;
 import com.jobpilot.domain.automation.AutomationSessionId;
+import com.jobpilot.domain.automation.AutomationStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,5 +34,12 @@ public class AutomationRepositoryImpl implements AutomationRepository {
     @Override
     public Page<AutomationSession> findByUserId(UUID userId, Pageable pageable) {
         return jpaRepository.findByUserId(userId, pageable).map(AutomationSessionEntity::toDomain);
+    }
+
+    @Override
+    public List<AutomationSession> findByStatus(AutomationStatus status, Pageable pageable) {
+        return jpaRepository.findByStatus(status.name(), pageable).stream()
+            .map(AutomationSessionEntity::toDomain)
+            .toList();
     }
 }

@@ -7,5 +7,9 @@ public interface PlaywrightAutomationPort {
     void click(String selector);
     String takeScreenshot();
     void waitForSelector(String selector);
+    void waitForTimeout(int millis);
+    String getHtml();
+    String evaluate(String script);
+    String getCurrentUrl();
     void closeBrowser();
 }

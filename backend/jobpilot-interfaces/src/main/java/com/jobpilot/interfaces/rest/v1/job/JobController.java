@@ -1,6 +1,7 @@
 package com.jobpilot.interfaces.rest.v1.job;
 
 import com.jobpilot.application.job.dto.*;
+import com.jobpilot.application.job.service.JobMatchingService;
 import com.jobpilot.application.job.usecase.*;
 import com.jobpilot.common.model.ApiResponse;
 import com.jobpilot.infrastructure.security.JwtPrincipal;
@@ -26,15 +27,18 @@ public class JobController {
     private final DeleteJobUseCase deleteJobUseCase;
     private final GetJobUseCase getJobUseCase;
     private final SearchJobsUseCase searchJobsUseCase;
+    private final JobMatchingService jobMatchingService;
 
     public JobController(CreateJobUseCase createJobUseCase, UpdateJobUseCase updateJobUseCase,
                           DeleteJobUseCase deleteJobUseCase, GetJobUseCase getJobUseCase,
-                          SearchJobsUseCase searchJobsUseCase) {
+                          SearchJobsUseCase searchJobsUseCase,
+                          JobMatchingService jobMatchingService) {
         this.createJobUseCase = createJobUseCase;
         this.updateJobUseCase = updateJobUseCase;
         this.deleteJobUseCase = deleteJobUseCase;
         this.getJobUseCase = getJobUseCase;
         this.searchJobsUseCase = searchJobsUseCase;
+        this.jobMatchingService = jobMatchingService;
     }
 
     @RateLimited(capacity = 100)
@@ -58,9 +62,19 @@ public class JobController {
     @GetMapping
     public ResponseEntity<ApiResponse<Page<JobResponse>>> search(
             @RequestParam(required = false) String query,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String location,
+            @RequestParam(required = false) String employmentType,
+            @RequestParam(required = false) String experienceLevel,
+            @RequestParam(required = false) String industry,
+            @RequestParam(required = false) Integer salaryMin,
+            @RequestParam(required = false) Integer salaryMax,
+            @RequestParam(required = false) String postedWithin,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        var command = new SearchJobsCommand(query, null, null, null, null, null, page, size);
+            @RequestParam(defaultValue = "12") int size) {
+        var searchQuery = query != null ? query : keyword;
+        var command = new SearchJobsCommand(searchQuery, null, employmentType, experienceLevel,
+            industry, location, salaryMin, salaryMax, postedWithin, page, size);
         var response = searchJobsUseCase.execute(command);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
@@ -81,6 +95,77 @@ public class JobController {
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable String id) {
         deleteJobUseCase.execute(new DeleteJobCommand(id));
         return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @RateLimited(capacity = 50)
+    @GetMapping("/matches")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getMatches(
+            @AuthenticationPrincipal JwtPrincipal principal) {
+        var matches = jobMatchingService.getMatches(principal.userId());
+        return ResponseEntity.ok(ApiResponse.ok(matches));
+    }
+
+    @RateLimited(capacity = 100)
+    @GetMapping("/recommendations")
+    public ResponseEntity<ApiResponse<List<JobResponse>>> recommendations(
+            @AuthenticationPrincipal JwtPrincipal principal,
+            @RequestParam(defaultValue = "10") int limit) {
+        var command = new SearchJobsCommand(null, null, null, null, null, null, null, null, null, 0, limit);
+        var response = searchJobsUseCase.execute(command);
+        return ResponseEntity.ok(ApiResponse.ok(response.getContent()));
+    }
+
+    @RateLimited(capacity = 50)
+    @GetMapping("/semantic-search")
+    public ResponseEntity<ApiResponse<Page<JobResponse>>> semanticSearch(
+            @RequestParam(defaultValue = "") String query,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+        var command = new SearchJobsCommand(query, null, null, null, null, null, null, null, null, page, size);
+        var response = searchJobsUseCase.execute(command);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @RateLimited(capacity = 50)
+    @PostMapping("/semantic-search")
+    public ResponseEntity<ApiResponse<Page<JobResponse>>> semanticSearchPost(
+            @RequestBody Map<String, Object> body,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+        var query = (String) body.getOrDefault("query", "");
+        var command = new SearchJobsCommand(query, null, null, null, null, null, null, null, null, page, size);
+        var response = searchJobsUseCase.execute(command);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @RateLimited(capacity = 100)
+    @GetMapping("/facets")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> facets() {
+        return ResponseEntity.ok(ApiResponse.ok(Map.of(
+            "employmentTypes", List.of("FULL_TIME", "PART_TIME", "CONTRACT", "INTERNSHIP", "TEMPORARY"),
+            "experienceLevels", List.of("ENTRY", "JUNIOR", "MID", "SENIOR", "LEAD", "EXECUTIVE"),
+            "industries", List.of(),
+            "locations", List.of(),
+            "salaryRanges", List.of(Map.of("min", 0, "max", 50000), Map.of("min", 50000, "max", 100000),
+                Map.of("min", 100000, "max", 150000), Map.of("min", 150000, "max", 200000))
+        )));
+    }
+
+    @RateLimited(capacity = 100)
+    @GetMapping("/aggregate")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> aggregate() {
+        return ResponseEntity.ok(ApiResponse.ok(Map.of(
+            "totalJobs", 0, "bySource", Map.of(), "byIndustry", Map.of(),
+            "byEmploymentType", Map.of(), "avgSalary", 0
+        )));
+    }
+
+    @RateLimited(capacity = 50)
+    @PostMapping("/matches/{id}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getMatchDetail(
+            @AuthenticationPrincipal JwtPrincipal principal, @PathVariable String id) {
+        var analysis = jobMatchingService.analyzeMatch(id, principal.userId());
+        return ResponseEntity.ok(ApiResponse.ok(analysis));
     }
 
     public record CreateJobRequest(

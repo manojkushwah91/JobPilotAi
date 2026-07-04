@@ -37,7 +37,7 @@ class ChangePasswordServiceTest {
     void shouldChangePasswordSuccessfully() {
         var email = Email.from("test@example.com");
         var hash = PasswordHash.from("$2a$12$ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx123");
-        var user = User.register(email, hash);
+        var user = User.register(email, "Test User", hash);
         var userId = user.userId().value().toString();
 
         when(userRepository.findById(any())).thenReturn(Optional.of(user));
@@ -54,7 +54,7 @@ class ChangePasswordServiceTest {
     void shouldRejectWrongCurrentPassword() {
         var email = Email.from("test@example.com");
         var hash = PasswordHash.from("$2a$12$ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx123");
-        var user = User.register(email, hash);
+        var user = User.register(email, "Test User", hash);
         var userId = user.userId().value().toString();
 
         when(userRepository.findById(any())).thenReturn(Optional.of(user));

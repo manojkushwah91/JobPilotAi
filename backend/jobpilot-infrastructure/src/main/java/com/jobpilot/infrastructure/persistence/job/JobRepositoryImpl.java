@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -34,6 +35,16 @@ public class JobRepositoryImpl implements JobRepository {
     @Override
     public Page<JobListing> search(String query, Pageable pageable) {
         return jpaRepository.search(query, pageable).map(JobListingEntity::toDomain);
+    }
+
+    @Override
+    public Page<JobListing> searchFiltered(String query, List<String> skills, String employmentType,
+                                            String experienceLevel, String industry, String location,
+                                            Integer salaryMin, Integer salaryMax, String postedWithin,
+                                            Pageable pageable) {
+        var spec = JobSearchSpecification.withFilters(query, skills, employmentType,
+            experienceLevel, industry, location, salaryMin, salaryMax, postedWithin);
+        return jpaRepository.findAll(spec, pageable).map(JobListingEntity::toDomain);
     }
 
     @Override

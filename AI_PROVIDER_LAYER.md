@@ -1,15 +1,15 @@
-# JobPilot AI — AI Provider Layer
+# JobPilot AI v2.0 — AI Provider Layer
 
-**Version:** 1.0  
+**Version:** 2.0  
 **Status:** Draft  
-**Phase:** 10 of 35  
+**Product:** JobPilot AI — "Offline-First Autonomous AI Job Agent"  
 **Author:** Chief Software Architect  
 
 ---
 
 ## 1. Module Purpose
 
-Abstract interface between business logic and LLM providers. Enables provider-swappable AI without changing any application code. Supports OpenAI, Anthropic, Ollama (local), and Google Gemini.
+Abstract interface between business logic and LLM providers. Enables provider-swappable AI without changing any application code. **Ollama is the default provider (local, offline-first).** Cloud providers (OpenAI, Anthropic, Google Gemini) are optional plugins.
 
 ---
 
@@ -17,36 +17,32 @@ Abstract interface between business logic and LLM providers. Enables provider-sw
 
 ```
 ┌──────────────────────────────────────────────┐
-│              Application Layer               │
-│  ResumeService  InterviewService  etc.       │
+│              Agent Runtime                   │
+│  AI Tools (ResumeParser, JobAnalyzer, etc.)  │
 │         │              │                     │
 │         ▼              ▼                     │
 │  ┌──────────────────────────────────────┐   │
-│  │      AiOrchestrationService          │   │
-│  │  (provider selection, caching,       │   │
-│  │   retry, cost tracking)             │   │
+│  │      AiProviderPort (Interface)      │   │
+│  │  + generateText(AiRequest): AiResponse│   │
+│  │  + generateStream(AiRequest): Flux   │   │
+│  │  + generateEmbedding(String): List    │   │
+│  │  + countTokens(String): int          │   │
+│  │  + isAvailable(): boolean            │   │
 │  └──────────────┬───────────────────────┘   │
 └─────────────────┼───────────────────────────┘
-                  │
-┌─────────────────▼───────────────────────────┐
-│            Domain Port (Interface)           │
-│         AIProviderPort (com.jobpilot)        │
-│  + generateText(AiRequest): AiResponse      │
-│  + generateStream(AiRequest): Flux<AiChunk> │
-│  + generateEmbedding(String): List<Float>   │
-│  + countTokens(String): int                 │
-└─────────────────┬───────────────────────────┘
                   │
 ┌─────────────────▼───────────────────────────┐
 │          Infrastructure Adapters             │
 │                                             │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐   │
-│  │  OpenAI  │ │Anthropic │ │  Ollama  │   │
-│  │  Adapter │ │ Adapter  │ │  Adapter │   │
+│  │  Ollama  │ │  OpenAI  │ │ Anthropic│   │
+│  │  Adapter │ │  Adapter │ │ Adapter  │   │
+│  │  (DEFAULT)│ │ (OPTIONAL)│ │ (OPTIONAL)│   │
 │  └──────────┘ └──────────┘ └──────────┘   │
 │  ┌──────────┐ ┌──────────────────────────┐│
 │  │  Gemini  │ │CircuitBreakerAspect (AOP)││
 │  │  Adapter │ └──────────────────────────┘│
+│  │ (OPTIONAL)│                            ││
 │  └──────────┘                              │
 └────────────────────────────────────────────┘
 ```
@@ -56,87 +52,183 @@ Abstract interface between business logic and LLM providers. Enables provider-sw
 ## 3. Provider Interface
 
 ```java
-public interface AIProviderPort {
+public interface AiProvider {
+    
     AiResponse generateText(AiRequest request);
+    
     Flux<AiChunk> generateStream(AiRequest request);
+    
     List<Float> generateEmbedding(String text);
+    
     int countTokens(String text);
+    
+    boolean isAvailable();
+    
+    String providerName();
 }
 
 // Domain objects (no framework imports):
-public record AiRequest(String model, List<AiMessage> messages,
-    double temperature, int maxTokens, List<String> stopSequences,
-    ResponseFormat responseFormat, List<AiTool> tools) {}
+public record AiRequest(
+    String systemPrompt,
+    String userPrompt,
+    double temperature,
+    int maxTokens,
+    List<String> stopSequences
+) {}
 
-public record AiMessage(AiMessageRole role, String content, String name) {}
+public record AiResponse(
+    String content,
+    String model,
+    int promptTokens,
+    int completionTokens,
+    long latencyMs
+) {}
 
-public record AiResponse(String content, FinishReason finishReason,
-    TokenUsage usage, String modelUsed, long latencyMs) {}
-
-public record AiChunk(String content, FinishReason finishReason) {}
-
-public record TokenUsage(int promptTokens, int completionTokens, int totalTokens) {}
-
-public record AiTool(String name, String description, JsonSchema parameters) {}
+public record AiChunk(
+    String content,
+    boolean done
+) {}
 ```
 
 ---
 
 ## 4. Provider Adapters
 
-### 4.1 OpenAI Adapter
+### 4.1 Ollama Provider (DEFAULT)
+
+```
+Endpoint: http://localhost:11434 (local)
+Models: llama3, qwen2.5, mistral, deepseek, gemma
+Auth: None (local)
+SDK: Custom HTTP client
+Auto-Detection: Checks http://localhost:11434 on startup
+```
+
+**Configuration:**
+```yaml
+ai:
+  provider:
+    default: ollama
+    ollama:
+      base-url: http://localhost:11434
+      model: llama3
+```
+
+**Auto-Detection:**
+```java
+@Component
+public class OllamaAutoDetector {
+    
+    @EventListener(ApplicationReadyEvent.class)
+    public void detectOllama() {
+        var ollamaAvailable = checkOllamaAvailability();
+        
+        if (!ollamaAvailable) {
+            log.warn("Ollama not detected. Please install Ollama from https://ollama.ai");
+            log.warn("After installation, run: ollama pull llama3");
+        } else {
+            log.info("Ollama detected and available");
+        }
+    }
+}
+```
+
+### 4.2 OpenAI Provider (OPTIONAL)
 
 ```
 Endpoint: https://api.openai.com/v1
-Models: gpt-4, gpt-4-turbo, gpt-3.5-turbo, text-embedding-3-small (512d), text-embedding-3-large (1536d)
-Auth: Bearer token (API key)
-Streaming: Server-Sent Events
+Models: gpt-4, gpt-4-turbo, gpt-3.5-turbo
+Auth: Bearer token (API key, user-provided, encrypted)
 SDK: Spring AI OpenAiChatClient
+Opt-in: User must explicitly configure API key
 ```
 
-### 4.2 Anthropic Adapter
+**Configuration:**
+```yaml
+ai:
+  provider:
+    default: ollama
+    enable-cloud-fallback: false
+    openai:
+      api-key: ${OPENAI_API_KEY}  # User-provided, encrypted
+      model: gpt-4
+```
+
+### 4.3 Anthropic Provider (OPTIONAL)
 
 ```
 Endpoint: https://api.anthropic.com/v1
-Models: claude-3-opus-20240229, claude-3-sonnet-20240229, claude-3-haiku-20240307
-Auth: x-api-key header
-Streaming: Server-Sent Events
+Models: claude-3-opus, claude-3-sonnet, claude-3-haiku
+Auth: x-api-key header (user-provided, encrypted)
 SDK: Spring AI AnthropicChatClient
+Opt-in: User must explicitly configure API key
 ```
 
-### 4.3 Ollama Adapter
-
+**Configuration:**
+```yaml
+ai:
+  provider:
+    default: ollama
+    enable-cloud-fallback: false
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY}  # User-provided, encrypted
+      model: claude-3-sonnet
 ```
-Endpoint: http://localhost:11434 (local) / http://ollama-service:11434 (docker)
-Models: llama3, mixtral, codellama, mistral
-Auth: None (local)
-SDK: Spring AI OllamaChatClient
-```
 
-### 4.4 Gemini Adapter
+### 4.4 Gemini Provider (OPTIONAL)
 
 ```
 Endpoint: https://generativelanguage.googleapis.com/v1
 Models: gemini-1.5-pro, gemini-1.5-flash
-Auth: API key query parameter
+Auth: API key query parameter (user-provided, encrypted)
 SDK: Google Vertex AI client
+Opt-in: User must explicitly configure API key
+```
+
+**Configuration:**
+```yaml
+ai:
+  provider:
+    default: ollama
+    enable-cloud-fallback: false
+    gemini:
+      api-key: ${GEMINI_API_KEY}  # User-provided, encrypted
+      model: gemini-1.5-pro
 ```
 
 ---
 
 ## 5. Provider Selection Strategy
 
-| Use Case | Primary Provider | Fallback | Model Selection |
-|----------|-----------------|----------|-----------------|
-| Resume tailoring | OpenAI GPT-4 | Anthropic Claude 3 Opus | Need highest quality text generation |
-| Resume scoring | Anthropic Claude 3 Sonnet | OpenAI GPT-4 | Good balance speed/quality |
-| Cover letter gen | OpenAI GPT-4 | Claude 3 Sonnet | Creativity + formatting |
-| Interview questions | OpenAI GPT-4 | Claude 3 Sonnet | Domain knowledge breadth |
-| Answer scoring | Anthropic Claude 3 Haiku | GPT-3.5 | Fast, cheap, sufficient |
-| Career path | GPT-3.5 | Claude 3 Haiku | Cost-optimized |
-| Skills gap | Embedding (local) + GPT-3.5 | None | Vector similarity first, LLM for text |
-| Networking msg | GPT-3.5 | Claude 3 Haiku | Short output, cost-sensitive |
-| Semantic search | Local embedding (Ollama) | OpenAI embedding | Zero cost per query |
+### 5.1 Default Strategy
+
+**Ollama is always the default provider.** The system is designed to work completely offline with Ollama.
+
+### 5.2 Cloud Fallback (Optional)
+
+Cloud providers can be configured as fallback if Ollama is unavailable, but this is **opt-in only**. The user must explicitly enable cloud fallback and provide API keys.
+
+**Configuration:**
+```yaml
+ai:
+  provider:
+    default: ollama
+    enable-cloud-fallback: true  # Opt-in only
+    fallback-order: openai, anthropic, gemini
+```
+
+### 5.3 Use Case Model Selection
+
+| Use Case | Ollama Model | Cloud Fallback (if enabled) |
+|----------|--------------|---------------------------|
+| Resume parsing | llama3 | gpt-4 |
+| Job analysis | llama3 | gpt-4 |
+| Resume tailoring | llama3 | gpt-4 |
+| Cover letter generation | llama3 | gpt-4 |
+| Answer generation | llama3 | gpt-4 |
+| Job ranking | llama3 | gpt-4 |
+| Scam detection | llama3 | gpt-4 |
+| Skill gap analysis | llama3 | gpt-4 |
 
 ---
 
@@ -146,14 +238,14 @@ SDK: Google Vertex AI client
 |-------------------|-----|---------|--------------|
 | `ai:prompt:{sha256(prompt)}` | 24h | Redis | Manual flush on prompt template update |
 | `ai:embedding:{sha256(text)}` | 7 days | Redis | LRU eviction |
-| `ai:ats:resume:{resumeId}:job:{jobHash}` | 1h | Redis | On resume update |
+| `ai:job:{jobId}:analysis` | 1h | Redis | On job update |
 
 ---
 
 ## 7. Circuit Breaker
 
 ```
-Per-provider circuit breaker (Resilience4j / custom AOP):
+Per-provider circuit breaker (Resilience4j):
   - CLOSED: normal operation, requests pass
   - OPEN: fail fast (throw AiServiceUnavailableException), fallback to next provider
   - HALF_OPEN: allow single test request after timeout
@@ -167,24 +259,152 @@ Thresholds:
 
 ---
 
-## 8. Token Tracking & Cost
+## 8. Token Tracking
 
 ```java
 AiUsageLog {
     userId, useCase, provider, model,
     promptTokens, completionTokens, totalTokens,
-    costMicroUsd,  // cost in micro-cents (1/1,000,000 USD)
     latencyMs,
     cacheHit: boolean,
     createdAt
 }
 
-// Cost calculation (configurable per model):
-// gpt-4: $30/1M input, $60/1M output tokens
-// claude-3-sonnet: $3/1M input, $15/1M output
-// etc.
+// Note: Cost tracking is not applicable for Ollama (local, free)
+// Cost tracking is optional for cloud providers (if enabled)
 ```
 
 ---
 
-**End of AI Provider Layer v1.0**
+## 9. Security
+
+### 9.1 API Key Management
+
+- Cloud AI API keys are encrypted at rest (AES-256)
+- API keys are never logged
+- API keys are user-provided and can be revoked at any time
+- API keys are stored in environment variables or Vault
+
+### 9.2 Data Privacy
+
+- **Ollama (Default):** All data stays on user's machine. No data leaves the local environment.
+- **Cloud AI (Optional):** Data is transmitted to cloud provider only if user explicitly opts in and provides API key.
+
+---
+
+## 10. Ollama Setup
+
+### 10.1 Installation
+
+**Linux:**
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+**macOS:**
+```bash
+brew install ollama
+```
+
+**Windows:**
+```powershell
+winget install ollama
+```
+
+### 10.2 Pull Models
+
+```bash
+# Pull default model
+ollama pull llama3
+
+# Pull additional models (optional)
+ollama pull qwen2.5
+ollama pull mistral
+ollama pull deepseek
+ollama pull gemma
+```
+
+### 10.3 Verify Installation
+
+```bash
+# Check Ollama is running
+ollama list
+
+# Test inference
+ollama run llama3 "What is 2+2?"
+```
+
+---
+
+## 11. Error Handling
+
+### 11.1 Ollama Unavailable
+
+If Ollama is not detected on startup:
+1. Log warning message
+2. Guide user through installation
+3. If cloud fallback is disabled (default), system operates in degraded mode (no AI features)
+4. If cloud fallback is enabled, attempt to use cloud provider
+
+### 11.2 Cloud Provider Unavailable
+
+If cloud provider is configured but unavailable:
+1. Log error
+2. Circuit breaker opens
+3. Fallback to next provider in fallback order
+4. If all providers unavailable, throw AiServiceUnavailableException
+
+---
+
+## 12. Testing
+
+### 12.1 Unit Tests
+
+Mock AI provider for deterministic tests:
+
+```java
+@Component
+@Profile("test")
+public class MockAiProvider implements AiProvider {
+    
+    @Override
+    public AiResponse generateText(AiRequest request) {
+        return AiResponse.builder()
+            .content("Mock response")
+            .model("mock-model")
+            .promptTokens(10)
+            .completionTokens(20)
+            .latencyMs(100)
+            .build();
+    }
+    
+    // ... other methods
+}
+```
+
+### 12.2 Integration Tests
+
+Test with real Ollama (optional, requires Ollama running):
+
+```java
+@SpringBootTest
+@EnabledIfEnvironmentVariable(named = "OLLAMA_ENABLED", matches = "true")
+class OllamaProviderIntegrationTest {
+    
+    @Test
+    void shouldGenerateText() {
+        var request = AiRequest.builder()
+            .systemPrompt("You are a helpful assistant")
+            .userPrompt("What is 2+2?")
+            .build();
+        
+        var response = ollamaProvider.generateText(request);
+        
+        assertThat(response.content()).isNotEmpty();
+    }
+}
+```
+
+---
+
+**End of AI Provider Layer v2.0**

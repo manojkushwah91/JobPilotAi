@@ -50,6 +50,7 @@ export interface LoginRequest {
 export interface RegisterRequest {
   email: string;
   password: string;
+  confirmPassword: string;
   name: string;
 }
 
@@ -88,14 +89,23 @@ export interface AtsSuggestion {
 // Job
 export interface JobListing {
   id: string;
+  source?: string;
+  sourceId?: string;
   title: string;
   companyName: string;
   companyLogoUrl?: string;
-  location: string;
-  salary: SalaryRange;
-  employmentType: string;
-  experienceLevel: string;
+  companyId?: string;
+  location?: Record<string, unknown>;
+  salary?: Record<string, unknown>;
+  description?: string;
+  requirements?: string[];
+  responsibilities?: string[];
+  benefits?: string[];
+  employmentType?: string;
+  experienceLevel?: string;
+  industry?: string;
   skills: string[];
+  applicationUrl?: string;
   postedAt: string;
   matchScore?: number;
 }
@@ -318,6 +328,23 @@ export interface BillingPlan {
   status: 'ACTIVE' | 'CANCELLED' | 'EXPIRED';
   currentPeriodStart: string;
   currentPeriodEnd: string;
+}
+
+export interface CoverLetter {
+  id: string;
+  title: string;
+  content: string;
+  tone?: string;
+  createdAt: string;
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+  link?: string;
 }
 
 export interface Invoice {

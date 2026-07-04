@@ -54,7 +54,7 @@ public class UserEntity extends BaseJpaEntity {
         entity.id = user.userId().value();
         entity.email = user.email().value();
         entity.passwordHash = user.passwordHash().value();
-        entity.name = user.email().value().split("@")[0];
+        entity.name = user.name() != null ? user.name() : user.email().value().split("@")[0];
         entity.role = user.role();
         entity.tier = user.role().name();
         entity.emailVerified = user.isEmailVerified();
@@ -66,10 +66,10 @@ public class UserEntity extends BaseJpaEntity {
     public User toDomain() {
         var userId = UserId.from(id);
         var emailVo = Email.from(email);
-        var passwordHashVo = PasswordHash.from(passwordHash);
+        var passwordHashVo = passwordHash != null ? PasswordHash.from(passwordHash) : null;
 
         return User.reconstitute(
-            id, userId, emailVo, passwordHashVo, role,
+            id, userId, name, emailVo, passwordHashVo, role,
             emailVerified, emailVerifiedAt,
             new HashSet<>(), deletedAt != null, deletedAt,
             createdAt, updatedAt

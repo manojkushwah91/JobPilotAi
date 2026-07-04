@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/search")
@@ -29,5 +30,30 @@ public class SearchController {
         }
         return ResponseEntity.ok(ApiResponse.ok(
             vectorSearchPort.searchSimilar(request.query(), pageable).map(JobResponse::from)));
+    }
+
+    @RateLimited(capacity = 100)
+    @GetMapping
+    public ResponseEntity<ApiResponse<Map<String, Object>>> search(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(ApiResponse.ok(Map.of(
+            "query", q,
+            "results", List.of(),
+            "total", 0,
+            "page", page,
+            "size", size
+        )));
+    }
+
+    @RateLimited(capacity = 100)
+    @GetMapping("/suggestions")
+    public ResponseEntity<ApiResponse<List<String>>> suggestions(@RequestParam String q) {
+        return ResponseEntity.ok(ApiResponse.ok(List.of(
+            q + " jobs",
+            q + " companies",
+            q + " remote positions"
+        )));
     }
 }

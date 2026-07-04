@@ -6,12 +6,17 @@ import com.jobpilot.application.ai.dto.*;
 import com.jobpilot.application.ai.ports.AiJobMatchPort;
 import com.jobpilot.application.ai.ports.AiProviderPort;
 import com.jobpilot.application.ai.ports.PromptTemplateRepository;
+import com.jobpilot.application.job.ports.JobRepository;
+import com.jobpilot.application.resume.ports.ResumeRepository;
+import com.jobpilot.domain.job.JobId;
+import com.jobpilot.domain.resume.ResumeId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class AiJobMatchService implements AiJobMatchPort {
@@ -21,21 +26,53 @@ public class AiJobMatchService implements AiJobMatchPort {
 
     private final AiProviderPort aiProvider;
     private final PromptTemplateRepository promptTemplateRepository;
+    private final ResumeRepository resumeRepository;
+    private final JobRepository jobRepository;
 
-    public AiJobMatchService(AiProviderPort aiProvider, PromptTemplateRepository promptTemplateRepository) {
+    public AiJobMatchService(AiProviderPort aiProvider,
+                             PromptTemplateRepository promptTemplateRepository,
+                             ResumeRepository resumeRepository,
+                             JobRepository jobRepository) {
         this.aiProvider = aiProvider;
         this.promptTemplateRepository = promptTemplateRepository;
+        this.resumeRepository = resumeRepository;
+        this.jobRepository = jobRepository;
     }
 
     @Override
     public AiJobMatchResponse matchJob(AiJobMatchRequest request) {
+        var resumeId = ResumeId.from(UUID.fromString(request.resumeId()));
+        var resume = resumeRepository.findById(resumeId)
+            .orElseThrow(() -> new IllegalArgumentException("Resume not found: " + request.resumeId()));
+
+        var jobId = JobId.from(UUID.fromString(request.jobId()));
+        var job = jobRepository.findById(jobId)
+            .orElseThrow(() -> new IllegalArgumentException("Job not found: " + request.jobId()));
+
+        var sectionsText = new StringBuilder();
+        for (var section : resume.sections()) {
+            sectionsText.append(section.type()).append(": ")
+                .append(section.content()).append("\n");
+        }
+
+        var jobText = job.title() + "\n" + job.description();
+
         var template = promptTemplateRepository.findActiveByUseCase("job_matching")
-            .orElseThrow(() -> new IllegalStateException("No active job_matching prompt template"));
-        var userPrompt = template.userPromptTemplate()
-            .replace("{{resumeId}}", request.resumeId())
-            .replace("{{jobId}}", request.jobId());
-        var result = aiProvider.executePrompt(template.systemPrompt(), userPrompt,
-            template.model(), template.temperature(), template.maxTokens());
+            .orElse(null);
+
+        String result;
+        if (template != null) {
+            var userPrompt = template.userPromptTemplate()
+                .replace("{{resumeContent}}", sectionsText.toString())
+                .replace("{{jobContent}}", jobText);
+            result = aiProvider.executePrompt(template.systemPrompt(), userPrompt,
+                template.model(), template.temperature(), template.maxTokens());
+        } else {
+            var system = "You are a job matching expert. Compare the candidate's resume against the job posting and return a JSON object with matchScore (0-100), matchBreakdown (object), matchedSkills (array), missingSkills (array), and recommendation (string).";
+            var user = "Resume:\n" + sectionsText + "\n\nJob:\n" + jobText;
+            result = aiProvider.executePrompt(system, user, null, 0.3, 2000);
+        }
+
         return parseMatch(result);
     }
 

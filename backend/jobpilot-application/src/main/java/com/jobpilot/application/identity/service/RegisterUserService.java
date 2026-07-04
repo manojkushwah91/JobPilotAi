@@ -9,6 +9,8 @@ import com.jobpilot.application.identity.ports.UserRepository;
 import com.jobpilot.application.notification.ports.EmailSenderPort;
 import com.jobpilot.application.identity.usecase.RegisterUserUseCase;
 import com.jobpilot.common.exception.DuplicateException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.jobpilot.domain.identity.Email;
 import com.jobpilot.domain.identity.PasswordHash;
 import com.jobpilot.domain.identity.User;
@@ -24,6 +26,8 @@ import java.util.UUID;
 @Service
 @Transactional
 public class RegisterUserService implements RegisterUserUseCase {
+
+    private static final Logger logger = LoggerFactory.getLogger(RegisterUserService.class);
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -52,17 +56,22 @@ public class RegisterUserService implements RegisterUserUseCase {
 
         var encodedPassword = passwordEncoder.encode(command.password());
         var passwordHash = PasswordHash.from(encodedPassword);
-        var user = User.register(email, passwordHash);
+        var user = User.register(email, command.name(), passwordHash);
 
         userRepository.save(user);
 
         var token = UUID.randomUUID().toString();
         var verificationToken = EmailVerificationToken.create(user.userId().value(), token, Duration.ofHours(24));
         emailVerificationTokenRepository.save(verificationToken);
-        emailSender.sendWithTemplate(user.email().value(), "verify-email", Map.of(
-            "name", user.email().value().split("@")[0],
-            "verifyLink", "http://localhost:3000/verify-email?token=" + token
-        ));
+        try {
+            emailSender.sendWithTemplate(user.email().value(), "verify-email", Map.of(
+                "name", user.email().value().split("@")[0],
+                "verifyLink", "http://localhost:3000/verify-email?token=" + token
+            ));
+        } catch (Exception e) {
+            // Email sending is non-critical; registration succeeds even if mail server is unavailable
+            logger.warn("Failed to send verification email to {}: {}", user.email().value(), e.getMessage());
+        }
 
         var accessToken = tokenProvider.generateAccessToken(
             user.userId().value().toString(),

@@ -4,6 +4,8 @@ import com.jobpilot.domain.ai.PromptTemplate;
 import com.jobpilot.domain.ai.PromptTemplateId;
 import com.jobpilot.infrastructure.persistence.shared.BaseJpaEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.List;
 import java.util.UUID;
@@ -18,6 +20,7 @@ public class PromptTemplateEntity extends BaseJpaEntity {
     @Column(name = "version", nullable = false) private int version;
     @Column(name = "system_prompt", nullable = false, columnDefinition = "text") private String systemPrompt;
     @Column(name = "user_prompt_template", nullable = false, columnDefinition = "text") private String userPromptTemplate;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "variables", columnDefinition = "jsonb") private String variables;
     @Column(name = "model") private String model;
     @Column(name = "temperature") private double temperature;

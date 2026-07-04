@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FileText, Plus, Loader2, Download, Trash2, Sparkles } from 'lucide-react';
 import { useApiQuery } from '@/lib/hooks/useQuery';
 import { API } from '@/lib/api/endpoints';
+import type { CoverLetter } from '@/types';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
 
@@ -23,8 +24,8 @@ export default function CoverLettersPage() {
   const [jobId, setJobId] = useState('');
   const [resumeId, setResumeId] = useState('');
 
-  const { data: raw, isLoading, error, refetch } = useApiQuery(['cover-letters'], API.coverLetters.list);
-  const letters: { id: string; title: string; content: string; tone?: string; createdAt: string }[] = (raw as any)?.data || [];
+  const { data, isLoading, error, refetch } = useApiQuery<CoverLetter[]>(['cover-letters'], API.coverLetters.list);
+  const letters: CoverLetter[] = data?.data ?? [];
 
   if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   if (error) return <div className="flex flex-col items-center justify-center h-64 gap-4"><p className="text-muted-foreground">Failed to load cover letters</p><Button onClick={() => refetch()}>Retry</Button></div>;

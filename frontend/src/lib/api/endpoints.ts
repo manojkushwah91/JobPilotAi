@@ -21,6 +21,8 @@ export const API = {
     score: (id: string) => `/resumes/${id}/score`,
     tailor: (id: string) => `/resumes/${id}/tailor`,
     export: (id: string, format: string) => `/resumes/${id}/export?format=${format}`,
+    upload: '/resumes/upload',
+    parse: '/resumes/parse',
   },
   coverLetters: {
     list: '/cover-letters',
@@ -38,6 +40,7 @@ export const API = {
     saved: '/jobs/saved',
     semanticSearch: '/jobs/semantic-search',
     facets: '/jobs/facets',
+    aggregate: '/jobs/aggregate',
   },
   applications: {
     list: '/applications',

@@ -6,12 +6,15 @@ import com.jobpilot.application.ai.dto.*;
 import com.jobpilot.application.ai.ports.AiProviderPort;
 import com.jobpilot.application.ai.ports.AiSkillGapPort;
 import com.jobpilot.application.ai.ports.PromptTemplateRepository;
+import com.jobpilot.application.resume.ports.ResumeRepository;
+import com.jobpilot.domain.resume.ResumeId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class AiSkillGapService implements AiSkillGapPort {
@@ -21,21 +24,44 @@ public class AiSkillGapService implements AiSkillGapPort {
 
     private final AiProviderPort aiProvider;
     private final PromptTemplateRepository promptTemplateRepository;
+    private final ResumeRepository resumeRepository;
 
-    public AiSkillGapService(AiProviderPort aiProvider, PromptTemplateRepository promptTemplateRepository) {
+    public AiSkillGapService(AiProviderPort aiProvider,
+                             PromptTemplateRepository promptTemplateRepository,
+                             ResumeRepository resumeRepository) {
         this.aiProvider = aiProvider;
         this.promptTemplateRepository = promptTemplateRepository;
+        this.resumeRepository = resumeRepository;
     }
 
     @Override
     public AiSkillGapResponse analyzeSkillGap(AiSkillGapRequest request) {
+        var resumeId = ResumeId.from(UUID.fromString(request.resumeId()));
+        var resume = resumeRepository.findById(resumeId)
+            .orElseThrow(() -> new IllegalArgumentException("Resume not found: " + request.resumeId()));
+
+        var sectionsText = new StringBuilder();
+        for (var section : resume.sections()) {
+            sectionsText.append(section.type()).append(": ")
+                .append(section.content()).append("\n");
+        }
+
         var template = promptTemplateRepository.findActiveByUseCase("skill_gap")
-            .orElseThrow(() -> new IllegalStateException("No active skill_gap prompt template"));
-        var userPrompt = template.userPromptTemplate()
-            .replace("{{resumeId}}", request.resumeId())
-            .replace("{{targetRole}}", request.targetRole());
-        var result = aiProvider.executePrompt(template.systemPrompt(), userPrompt,
-            template.model(), template.temperature(), template.maxTokens());
+            .orElse(null);
+
+        String result;
+        if (template != null) {
+            var userPrompt = template.userPromptTemplate()
+                .replace("{{resumeContent}}", sectionsText.toString())
+                .replace("{{targetRole}}", request.targetRole());
+            result = aiProvider.executePrompt(template.systemPrompt(), userPrompt,
+                template.model(), template.temperature(), template.maxTokens());
+        } else {
+            var system = "You are a skill gap analyst. Compare the candidate's resume against the target role and return a JSON object with existingSkills (array), missingSkills (array), skillGaps (array of {skill, category, importance, learningResources}), and summary (string).";
+            var user = "Resume:\n" + sectionsText + "\n\nTarget Role:\n" + request.targetRole();
+            result = aiProvider.executePrompt(system, user, null, 0.3, 2000);
+        }
+
         return parseGap(result);
     }
 

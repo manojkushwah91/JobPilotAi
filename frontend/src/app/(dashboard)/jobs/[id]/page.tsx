@@ -17,9 +17,19 @@ import {
 import { toast } from 'sonner';
 import { ArrowLeft, MapPin, Briefcase, Clock, Building2, ExternalLink, Bookmark, Send, Sparkles } from 'lucide-react';
 
-function formatSalary(salary: { min: number; max: number; currency: string }) {
-  const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: salary.currency, maximumFractionDigits: 0 });
-  return `${fmt.format(salary.min)} - ${fmt.format(salary.max)}`;
+function formatSalary(salary: Record<string, unknown>) {
+  if (typeof salary.min === 'number' && typeof salary.max === 'number' && typeof salary.currency === 'string') {
+    const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: salary.currency, maximumFractionDigits: 0 });
+    return `${fmt.format(salary.min)} - ${fmt.format(salary.max)}`;
+  }
+  if (typeof salary.text === 'string') return salary.text;
+  return '';
+}
+
+function formatLocation(location: Record<string, unknown>) {
+  if (typeof location.text === 'string') return location.text;
+  const parts = [location.city, location.state, location.country].filter((p): p is string => typeof p === 'string');
+  return parts.join(', ') || 'Remote';
 }
 
 function timeAgo(dateStr: string) {
@@ -121,7 +131,7 @@ export default function JobDetailPage() {
               <h1 className="text-2xl font-bold">{job.title}</h1>
               <p className="text-lg text-muted-foreground">{job.companyName}</p>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1"><MapPin className="h-4 w-4" />{job.location}</span>
+                <span className="flex items-center gap-1"><MapPin className="h-4 w-4" />{job.location ? formatLocation(job.location) : 'Remote'}</span>
                 <span className="flex items-center gap-1"><Briefcase className="h-4 w-4" />{job.employmentType?.replace(/_/g, ' ')}</span>
                 <span className="flex items-center gap-1"><Clock className="h-4 w-4" />{timeAgo(job.postedAt)}</span>
                 {job.salary && <span className="flex items-center gap-1 font-medium text-primary">{formatSalary(job.salary)}</span>}
@@ -144,22 +154,22 @@ export default function JobDetailPage() {
               <CardTitle className="text-base">Job Description</CardTitle>
             </CardHeader>
             <CardContent>
-              {(job as any).description ? (
-                <div className="prose prose-sm max-w-none text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: (job as any).description }} />
+              {job.description ? (
+                <div className="prose prose-sm max-w-none text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: job.description }} />
               ) : (
                 <p className="text-sm text-muted-foreground">No description available</p>
               )}
             </CardContent>
           </Card>
 
-          {(job as any).requirements?.length > 0 && (
+          {job.requirements && job.requirements.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Requirements</CardTitle>
               </CardHeader>
               <CardContent>
                 <ul className="list-disc space-y-1 pl-4 text-sm text-muted-foreground">
-                  {(job as any).requirements?.map((req: string, i: number) => (
+                  {job.requirements.map((req, i) => (
                     <li key={i}>{req}</li>
                   ))}
                 </ul>
@@ -167,14 +177,14 @@ export default function JobDetailPage() {
             </Card>
           )}
 
-          {(job as any).responsibilities?.length > 0 && (
+          {job.responsibilities && job.responsibilities.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Responsibilities</CardTitle>
               </CardHeader>
               <CardContent>
                 <ul className="list-disc space-y-1 pl-4 text-sm text-muted-foreground">
-                  {(job as any).responsibilities?.map((r: string, i: number) => (
+                  {job.responsibilities.map((r, i) => (
                     <li key={i}>{r}</li>
                   ))}
                 </ul>
@@ -182,14 +192,14 @@ export default function JobDetailPage() {
             </Card>
           )}
 
-          {(job as any).benefits?.length > 0 && (
+          {job.benefits && job.benefits.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Benefits</CardTitle>
               </CardHeader>
               <CardContent>
                 <ul className="list-disc space-y-1 pl-4 text-sm text-muted-foreground">
-                  {(job as any).benefits?.map((b: string, i: number) => (
+                  {job.benefits.map((b, i) => (
                     <li key={i}>{b}</li>
                   ))}
                 </ul>
@@ -255,7 +265,7 @@ export default function JobDetailPage() {
           <DialogHeader>
             <DialogTitle>Apply to {job.title}</DialogTitle>
             <DialogDescription>
-              {job.companyName} - {job.location}
+              {job.companyName} - {job.location ? formatLocation(job.location) : 'Remote'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

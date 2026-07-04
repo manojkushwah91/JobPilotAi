@@ -9,49 +9,49 @@ class RegisterUserCommandTest {
 
     @Test
     void shouldRejectBlankEmail() {
-        assertThatThrownBy(() -> new RegisterUserCommand("", "ValidPass1!", "ValidPass1!"))
+        assertThatThrownBy(() -> new RegisterUserCommand(null, "", "ValidPass1!", "ValidPass1!"))
             .isInstanceOf(ValidationException.class);
     }
 
     @Test
     void shouldRejectInvalidEmail() {
-        assertThatThrownBy(() -> new RegisterUserCommand("not-email", "ValidPass1!", "ValidPass1!"))
+        assertThatThrownBy(() -> new RegisterUserCommand(null, "not-email", "ValidPass1!", "ValidPass1!"))
             .isInstanceOf(ValidationException.class);
     }
 
     @Test
     void shouldRejectShortPassword() {
-        assertThatThrownBy(() -> new RegisterUserCommand("test@test.com", "Short1!", "Short1!"))
+        assertThatThrownBy(() -> new RegisterUserCommand(null, "test@test.com", "Short1!", "Short1!"))
             .isInstanceOf(ValidationException.class);
     }
 
     @Test
     void shouldRejectPasswordWithoutUppercase() {
-        assertThatThrownBy(() -> new RegisterUserCommand("test@test.com", "nouppercase1!", "nouppercase1!"))
+        assertThatThrownBy(() -> new RegisterUserCommand(null, "test@test.com", "nouppercase1!", "nouppercase1!"))
             .isInstanceOf(ValidationException.class);
     }
 
     @Test
     void shouldRejectPasswordWithoutLowercase() {
-        assertThatThrownBy(() -> new RegisterUserCommand("test@test.com", "NOLOWERCASE1!", "NOLOWERCASE1!"))
+        assertThatThrownBy(() -> new RegisterUserCommand(null, "test@test.com", "NOLOWERCASE1!", "NOLOWERCASE1!"))
             .isInstanceOf(ValidationException.class);
     }
 
     @Test
     void shouldRejectPasswordWithoutDigit() {
-        assertThatThrownBy(() -> new RegisterUserCommand("test@test.com", "NoDigitPass!", "NoDigitPass!"))
+        assertThatThrownBy(() -> new RegisterUserCommand(null, "test@test.com", "NoDigitPass!", "NoDigitPass!"))
             .isInstanceOf(ValidationException.class);
     }
 
     @Test
     void shouldRejectPasswordWithoutSpecialChar() {
-        assertThatThrownBy(() -> new RegisterUserCommand("test@test.com", "NoSpecialChar1", "NoSpecialChar1"))
+        assertThatThrownBy(() -> new RegisterUserCommand(null, "test@test.com", "NoSpecialChar1", "NoSpecialChar1"))
             .isInstanceOf(ValidationException.class);
     }
 
     @Test
     void shouldRejectMismatchedPasswords() {
-        assertThatThrownBy(() -> new RegisterUserCommand("test@test.com", "ValidPass1!", "Different1!"))
+        assertThatThrownBy(() -> new RegisterUserCommand(null, "test@test.com", "ValidPass1!", "Different1!"))
             .isInstanceOf(ValidationException.class);
     }
 }

@@ -1,16 +1,20 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Navigation', () => {
-  test('sidebar navigation links exist on dashboard', async ({ page }) => {
+  test('login page shows OAuth buttons', async ({ page }) => {
     await page.goto('/login');
-    const navLinks = page.locator('nav a, [role="navigation"] a');
-    const count = await navLinks.count();
-    expect(count).toBeGreaterThan(0);
+    await expect(page.getByRole('button', { name: /google/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /linkedin/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /github/i })).toBeVisible();
   });
 
-  test('settings page has tabs', async ({ page }) => {
+  test('forgot password link exists on login page', async ({ page }) => {
     await page.goto('/login');
-    const response = await page.goto('/settings/profile');
-    expect(response?.status()).toBe(200);
+    await expect(page.getByRole('link', { name: /forgot password/i })).toBeVisible();
+  });
+
+  test('settings page redirects to login when unauthenticated', async ({ page }) => {
+    await page.goto('/settings/profile');
+    await expect(page).toHaveURL(/\/login/);
   });
 });

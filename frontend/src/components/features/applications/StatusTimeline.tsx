@@ -1,6 +1,6 @@
 'use client';
 
-import type { StatusChange } from '@/types';
+import type { ApplicationStatus, StatusChange } from '@/types';
 import { StatusBadge } from './StatusBadge';
 import { cn } from '@/lib/utils/cn';
 
@@ -37,10 +37,10 @@ export function StatusTimeline({ history }: StatusTimelineProps) {
             </div>
             <div className="flex-1 pb-2">
               <div className="flex items-center gap-2">
-                <StatusBadge status={change.to as any} className="text-[10px]" />
+                <StatusBadge status={change.to as ApplicationStatus} className="text-[10px]" />
                 {change.from && (
                   <span className="text-xs text-muted-foreground">
-                    from <StatusBadge status={change.from as any} className="text-[10px]" />
+                    from <StatusBadge status={change.from as ApplicationStatus} className="text-[10px]" />
                   </span>
                 )}
               </div>

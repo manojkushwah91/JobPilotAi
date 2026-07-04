@@ -12,7 +12,7 @@ class UserTest {
     void shouldRegisterNewUser() {
         var email = Email.from("test@example.com");
         var passwordHash = PasswordHash.from("$2a$12$ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx123");
-        var user = User.register(email, passwordHash);
+        var user = User.register(email, "Test User", passwordHash);
 
         assertThat(user.userId()).isNotNull();
         assertThat(user.email()).isEqualTo(email);
@@ -26,7 +26,7 @@ class UserTest {
     void shouldRegisterDomainEvent() {
         var email = Email.from("test@example.com");
         var passwordHash = PasswordHash.from("$2a$12$ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx123");
-        var user = User.register(email, passwordHash);
+        var user = User.register(email, "Test User", passwordHash);
 
         var events = user.drainEvents();
         assertThat(events).hasSize(1);
@@ -93,7 +93,7 @@ class UserTest {
         var email = Email.from("test@example.com");
         var hash = PasswordHash.from("$2a$12$ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx123");
 
-        var user = User.reconstitute(id, userId, email, hash, Role.PRO, true, null,
+        var user = User.reconstitute(id, userId, "Test User", email, hash, Role.PRO, true, null,
             java.util.Set.of(), false, null, java.time.Instant.now(), java.time.Instant.now());
 
         assertThat(user.userId()).isEqualTo(userId);
@@ -106,7 +106,7 @@ class UserTest {
     private static User createTestUser() {
         var email = Email.from("test@example.com");
         var hash = PasswordHash.from("$2a$12$ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx123");
-        var user = User.register(email, hash);
+        var user = User.register(email, "Test User", hash);
         user.drainEvents();
         return user;
     }

@@ -26,7 +26,11 @@ export default function RegisterPage() {
     if (!email) newErrors.email = 'Email is required';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) newErrors.email = 'Invalid email address';
     if (!password) newErrors.password = 'Password is required';
-    else if (password.length < 8) newErrors.password = 'Password must be at least 8 characters';
+    else if (password.length < 12) newErrors.password = 'Password must be at least 12 characters';
+    else if (!/[A-Z]/.test(password)) newErrors.password = 'Password must contain an uppercase letter';
+    else if (!/[a-z]/.test(password)) newErrors.password = 'Password must contain a lowercase letter';
+    else if (!/\d/.test(password)) newErrors.password = 'Password must contain a digit';
+    else if (!/[!@#$%^&*()_+=\-\[\]{};':"\\|,.<>\/?]/.test(password)) newErrors.password = 'Password must contain a special character';
     if (password !== confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -37,7 +41,7 @@ export default function RegisterPage() {
     if (!validate()) return;
     setIsLoading(true);
     try {
-      await register({ name: name.trim(), email, password });
+      await register({ name: name.trim(), email, password, confirmPassword });
       toast.success('Account created successfully!');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';

@@ -6,6 +6,7 @@ import com.jobpilot.domain.identity.Email;
 import java.util.regex.Pattern;
 
 public record RegisterUserCommand(
+    String name,
     String email,
     String password,
     String confirmPassword
@@ -14,6 +15,10 @@ public record RegisterUserCommand(
     private static final Pattern SPECIAL_CHAR = Pattern.compile("[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]");
 
     public RegisterUserCommand {
+        if (name == null || name.isBlank()) {
+            name = email != null ? email.split("@")[0] : "User";
+        }
+
         if (email == null || email.isBlank()) {
             throw new ValidationException("email", "Email must not be blank");
         }

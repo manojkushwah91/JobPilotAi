@@ -37,6 +37,11 @@ jwt:
     public-key: placeholder-dev-key
     private-key: placeholder-dev-key
 
+ai:
+  openai:
+    api-key: test-placeholder-key
+    model: gpt-4o-mini
+
 management:
   tracing:
     sampling:

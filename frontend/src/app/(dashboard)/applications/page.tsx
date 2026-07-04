@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useApiQuery, useApiMutation } from '@/lib/hooks/useQuery';
+import { apiPut } from '@/lib/api/client';
 import { API } from '@/lib/api/endpoints';
 import type { Application, ApplicationStatus } from '@/types';
 import { KanbanColumn } from '@/components/features/applications/KanbanColumn';
@@ -33,6 +35,7 @@ const STATUS_LABELS: Record<ApplicationStatus, string> = {
 };
 
 export default function ApplicationsPage() {
+  const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [createOpen, setCreateOpen] = useState(false);
@@ -54,15 +57,16 @@ export default function ApplicationsPage() {
     }
   );
 
-  const updateStatusMutation = useApiMutation<Application, { status: ApplicationStatus }>('PUT', '', {
-    onSuccess: () => toast.success('Status updated'),
-    onError: () => toast.error('Failed to update status'),
-  });
-
   const applications = data?.data ?? [];
 
-  const handleStatusChange = (id: string, newStatus: ApplicationStatus) => {
-    updateStatusMutation.mutate({ status: newStatus });
+  const handleStatusChange = async (id: string, newStatus: ApplicationStatus) => {
+    try {
+      await apiPut(API.applications.status(id), { status: newStatus });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      toast.success('Status updated');
+    } catch {
+      toast.error('Failed to update status');
+    }
   };
 
   const filtered = applications.filter((app) => {

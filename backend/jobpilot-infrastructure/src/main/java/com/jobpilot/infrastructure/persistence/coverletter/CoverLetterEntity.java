@@ -5,6 +5,8 @@ import com.jobpilot.domain.coverletter.CoverLetterId;
 import com.jobpilot.domain.identity.UserId;
 import com.jobpilot.infrastructure.persistence.shared.BaseJpaEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -25,9 +27,13 @@ public class CoverLetterEntity extends BaseJpaEntity {
     @Column(name = "company_name", nullable = false)
     private String companyName;
 
+    @Column(name = "job_title")
+    private String jobTitle;
+
     @Column(name = "recipient_name")
     private String recipientName;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "body", columnDefinition = "jsonb", nullable = false)
     private String body;
 
@@ -54,6 +60,7 @@ public class CoverLetterEntity extends BaseJpaEntity {
         entity.userId = coverLetter.userId().value();
         entity.title = coverLetter.title();
         entity.companyName = coverLetter.companyName();
+        entity.jobTitle = coverLetter.jobTitle();
         entity.recipientName = coverLetter.recipientName();
         entity.body = "\"" + escapeJson(coverLetter.content()) + "\"";
         entity.tone = coverLetter.tone();
@@ -69,6 +76,7 @@ public class CoverLetterEntity extends BaseJpaEntity {
             UserId.from(userId),
             title,
             companyName,
+            jobTitle,
             unescapeJson(body),
             tone,
             recipientName,

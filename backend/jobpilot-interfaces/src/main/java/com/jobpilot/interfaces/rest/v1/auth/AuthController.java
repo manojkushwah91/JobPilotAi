@@ -20,6 +20,8 @@ import com.jobpilot.application.identity.usecase.RegisterUserUseCase;
 import com.jobpilot.application.notification.ports.EmailSenderPort;
 import com.jobpilot.common.model.ApiResponse;
 import com.jobpilot.infrastructure.security.JwtPrincipal;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.jobpilot.interfaces.rest.annotation.RateLimited;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -37,6 +39,8 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
 
     private final RegisterUserUseCase registerUserUseCase;
     private final AuthenticateUserUseCase authenticateUserUseCase;
@@ -77,7 +81,7 @@ public class AuthController {
     @RateLimited(capacity = 10)
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
-        var command = new RegisterUserCommand(request.email(), request.password(), request.confirmPassword());
+        var command = new RegisterUserCommand(request.name(), request.email(), request.password(), request.confirmPassword());
         var response = registerUserUseCase.execute(command);
         return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.created(response));
@@ -128,10 +132,14 @@ public class AuthController {
             var token = UUID.randomUUID().toString();
             var resetToken = com.jobpilot.domain.identity.PasswordResetToken.create(user.userId().value(), token, java.time.Duration.ofHours(1));
             passwordResetTokenRepository.save(resetToken);
-            emailSender.sendWithTemplate(request.email(), "password-reset", Map.of(
-                "name", user.email().value().split("@")[0],
-                "resetLink", "http://localhost:3000/reset-password?token=" + token
-            ));
+            try {
+                emailSender.sendWithTemplate(request.email(), "password-reset", Map.of(
+                    "name", user.email().value().split("@")[0],
+                    "resetLink", "http://localhost:3000/reset-password?token=" + token
+                ));
+            } catch (Exception e) {
+                logger.warn("Failed to send password-reset email to {}: {}", request.email(), e.getMessage());
+            }
         }
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
@@ -204,6 +212,7 @@ public class AuthController {
     }
 
     public record RegisterRequest(
+        @Size(max = 255) String name,
         @NotBlank @Email @Size(max = 255) String email,
         @NotBlank @Size(min = 12, max = 128) String password,
         @NotBlank String confirmPassword

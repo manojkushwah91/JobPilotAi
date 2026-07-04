@@ -21,7 +21,7 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: 'Cancelled',
 };
 
-const STATUS_VARIANTS: Record<string, string> = {
+const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning'> = {
   QUEUED: 'secondary',
   RUNNING: 'default',
   AWAITING_CONFIRMATION: 'warning',
@@ -117,7 +117,7 @@ export default function AutomationSessionPage() {
             <p className="text-sm text-muted-foreground">ID: {session.id}</p>
           </div>
         </div>
-        <Badge variant={STATUS_VARIANTS[session.status] as any}>
+        <Badge variant={STATUS_VARIANTS[session.status]}>
           {STATUS_LABELS[session.status] || session.status}
         </Badge>
       </div>

@@ -44,7 +44,7 @@ public class UserController {
     }
 
     @RateLimited(capacity = 100)
-    @GetMapping("/me")
+    @GetMapping({"/me", "/me/profile"})
     public ResponseEntity<ApiResponse<UserProfileResponse>> getProfile(
             @AuthenticationPrincipal JwtPrincipal principal) {
         var userId = UUID.fromString(principal.userId());
@@ -53,7 +53,7 @@ public class UserController {
     }
 
     @RateLimited(capacity = 100)
-    @PutMapping("/me")
+    @PutMapping({"/me", "/me/profile"})
     public ResponseEntity<ApiResponse<UserProfileResponse>> updateProfile(
             @Valid @RequestBody UpdateProfileRequest request,
             @AuthenticationPrincipal JwtPrincipal principal) {

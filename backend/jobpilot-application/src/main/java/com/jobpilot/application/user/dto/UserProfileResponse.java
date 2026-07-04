@@ -18,9 +18,9 @@ public record UserProfileResponse(
         return new UserProfileResponse(
             user.userId().value().toString(),
             user.email().value(),
-            null,
+            user.name(),
             user.role().name(),
-            null,
+            user.role().name(),
             null,
             null,
             user.createdAt()

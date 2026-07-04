@@ -1,21 +1,26 @@
 'use client';
 
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Bell, CheckCheck, Loader2, Mail, MailOpen } from 'lucide-react';
 import { useApiQuery } from '@/lib/hooks/useQuery';
+import { apiPost } from '@/lib/api/client';
 import { API } from '@/lib/api/endpoints';
+import type { Notification } from '@/types';
+import { toast } from 'sonner';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
 dayjs.extend(relativeTime);
 
 export default function NotificationsPage() {
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState('all');
-  const { data: raw, isLoading, error, refetch } = useApiQuery(['notifications'], API.notifications.list);
-  const notifications: { id: string; title: string; message: string; read: boolean; createdAt: string; link?: string }[] = (raw as any)?.data || [];
+  const { data, isLoading, error, refetch } = useApiQuery<Notification[]>(['notifications'], API.notifications.list);
+  const notifications: Notification[] = data?.data ?? [];
   const filtered = tab === 'unread' ? notifications.filter(n => !n.read) : notifications;
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -29,7 +34,7 @@ export default function NotificationsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
           <p className="text-muted-foreground">Stay updated on your applications and activity</p>
         </div>
-        {unreadCount > 0 && <Button variant="outline" size="sm"><CheckCheck className="mr-2 h-4 w-4" /> Mark all read</Button>}
+        {unreadCount > 0 && <Button variant="outline" size="sm" onClick={async () => { try { await apiPost(API.notifications.markAllRead); queryClient.invalidateQueries({ queryKey: ['notifications'] }); toast.success('All notifications marked as read'); } catch { toast.error('Failed to mark all as read'); } }}><CheckCheck className="mr-2 h-4 w-4" /> Mark all read</Button>}
       </div>
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>

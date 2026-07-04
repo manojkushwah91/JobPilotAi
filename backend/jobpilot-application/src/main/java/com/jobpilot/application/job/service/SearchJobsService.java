@@ -20,9 +20,22 @@ public class SearchJobsService implements SearchJobsUseCase {
     @Override
     public Page<JobResponse> execute(SearchJobsCommand command) {
         var pageable = PageRequest.of(command.page(), command.size());
-        if (command.query() != null && !command.query().isBlank()) {
-            return jobRepository.search(command.query(), pageable)
-                .map(CreateJobService::toResponse);
+        var hasFilters = command.query() != null && !command.query().isBlank()
+            || (command.skills() != null && !command.skills().isEmpty())
+            || command.employmentType() != null && !command.employmentType().isBlank()
+            || command.experienceLevel() != null && !command.experienceLevel().isBlank()
+            || command.industry() != null && !command.industry().isBlank()
+            || command.location() != null && !command.location().isBlank()
+            || command.salaryMin() != null || command.salaryMax() != null
+            || command.postedWithin() != null && !command.postedWithin().isBlank();
+
+        if (hasFilters) {
+            return jobRepository.searchFiltered(
+                command.query(), command.skills(), command.employmentType(),
+                command.experienceLevel(), command.industry(), command.location(),
+                command.salaryMin(), command.salaryMax(), command.postedWithin(),
+                pageable
+            ).map(CreateJobService::toResponse);
         }
         return jobRepository.findAllActive(pageable)
             .map(CreateJobService::toResponse);

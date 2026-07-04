@@ -37,21 +37,29 @@ public class OllamaAiProvider implements AiProviderPort {
     public String executePrompt(String systemPrompt, String userPrompt, String modelOverride,
                                 double temperature, int maxTokens) {
         var model = modelOverride != null ? modelOverride : defaultModel;
-        var prompt = "System: " + systemPrompt + "\n\nUser: " + userPrompt + "\n\nAssistant:";
+
+        var messages = java.util.List.of(
+            Map.of("role", "system", "content", systemPrompt),
+            Map.of("role", "user", "content", userPrompt)
+        );
 
         var body = Map.of(
             "model", model,
-            "prompt", prompt,
+            "messages", messages,
             "stream", false,
             "options", Map.of("temperature", temperature, "num_predict", maxTokens)
         );
 
         var start = System.currentTimeMillis();
-        var response = rest.postForObject(baseUrl + "/api/generate", body, OllamaGenerateResponse.class);
+        var response = rest.postForObject(baseUrl + "/api/chat", body, OllamaChatResponse.class);
         var latencyMs = (int) (System.currentTimeMillis() - start);
 
         logUsage("prompt_execution", "ollama", model, 0, 0, latencyMs, false);
-        return response != null ? response.response() : "";
+
+        if (response != null && response.message() != null) {
+            return response.message().content();
+        }
+        return "";
     }
 
     @Override
@@ -62,5 +70,6 @@ public class OllamaAiProvider implements AiProviderPort {
         usageLogJpaRepository.save(AiUsageLogEntity.fromDomain(log));
     }
 
-    private record OllamaGenerateResponse(String model, String response, Long promptEvalCount, Long evalCount) {}
+    private record OllamaChatMessage(String role, String content) {}
+    private record OllamaChatResponse(String model, OllamaChatMessage message, Boolean done) {}
 }

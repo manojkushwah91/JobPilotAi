@@ -39,7 +39,7 @@ class RefreshTokenServiceTest {
     void shouldRefreshTokensSuccessfully() {
         var email = Email.from("test@example.com");
         var hash = PasswordHash.from("$2a$12$ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx123");
-        var user = User.register(email, hash);
+        var user = User.register(email, "Test User", hash);
         var userId = user.userId().value().toString();
 
         when(tokenProvider.validateToken(any())).thenReturn(true);
@@ -81,7 +81,7 @@ class RefreshTokenServiceTest {
     void shouldRejectDeletedUser() {
         var email = Email.from("test@example.com");
         var hash = PasswordHash.from("$2a$12$ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx123");
-        var user = User.register(email, hash);
+        var user = User.register(email, "Test User", hash);
         user.softDelete();
         var userId = user.userId().value().toString();
 

@@ -34,11 +34,11 @@ public class UserSettingsRepositoryImpl implements UserSettingsRepository {
 
         var row = (Object[]) rows.get(0);
         return Optional.of(new UserSettingsResponse(
-            parseJson((String) row[0]),
-            parseJson((String) row[1]),
-            parseJson((String) row[2]),
-            parseJson((String) row[3]),
-            parseJson((String) row[4])
+            parseJson(row[0] != null ? row[0].toString() : "{}"),
+            parseJson(row[1] != null ? row[1].toString() : "{}"),
+            parseJson(row[2] != null ? row[2].toString() : "{}"),
+            parseJson(row[3] != null ? row[3].toString() : "{}"),
+            parseJson(row[4] != null ? row[4].toString() : "{}")
         ));
     }
 

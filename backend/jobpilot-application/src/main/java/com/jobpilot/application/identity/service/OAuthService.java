@@ -133,7 +133,7 @@ public class OAuthService {
             return userRepository.save(user);
         }
         var passwordHash = PasswordHash.from(UUID.randomUUID().toString());
-        var user = User.register(emailVo, passwordHash);
+        var user = User.register(emailVo, emailVo.value().split("@")[0], passwordHash);
         user.verifyEmail();
         user.addOAuthProvider(OAuthProvider.from(provider, providerUserId));
         return userRepository.save(user);

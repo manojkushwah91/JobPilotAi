@@ -7,9 +7,19 @@ import type { JobListing } from '@/types';
 import { cn } from '@/lib/utils/cn';
 import { Bookmark, MapPin, Briefcase, Clock } from 'lucide-react';
 
-function formatSalary(salary: { min: number; max: number; currency: string }) {
-  const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: salary.currency, maximumFractionDigits: 0 });
-  return `${fmt.format(salary.min)} - ${fmt.format(salary.max)}`;
+function formatSalary(salary: Record<string, unknown>) {
+  if (typeof salary.min === 'number' && typeof salary.max === 'number' && typeof salary.currency === 'string') {
+    const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: salary.currency, maximumFractionDigits: 0 });
+    return `${fmt.format(salary.min)} - ${fmt.format(salary.max)}`;
+  }
+  if (typeof salary.text === 'string') return salary.text;
+  return '';
+
+}
+function formatLocation(location: Record<string, unknown>) {
+  if (typeof location.text === 'string') return location.text;
+  const parts = [location.city, location.state, location.country].filter((p): p is string => typeof p === 'string');
+  return parts.join(', ') || 'Remote';
 }
 
 function timeAgo(dateStr: string) {
@@ -60,7 +70,7 @@ export function JobCard({ job, onSave, isSaved }: JobCardProps) {
           <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <MapPin className="h-3 w-3" />
-              {job.location}
+              {job.location ? formatLocation(job.location) : 'Remote'}
             </span>
             <span className="flex items-center gap-1">
               <Briefcase className="h-3 w-3" />

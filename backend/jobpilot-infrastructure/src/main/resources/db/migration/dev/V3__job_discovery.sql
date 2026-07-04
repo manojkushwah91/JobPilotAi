@@ -24,7 +24,7 @@ CREATE TABLE job_listings (
     application_url VARCHAR(512),
     posted_at       TIMESTAMPTZ,
     scraped_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    embeddings      vector(1536),
+    embeddings      float8[],
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -38,7 +38,7 @@ CREATE INDEX idx_jobs_skills ON job_listings USING GIN(skills);
 CREATE INDEX idx_jobs_fts ON job_listings USING GIN(
     to_tsvector('english', coalesce(title, '') || ' ' || coalesce(description, ''))
 );
-CREATE INDEX idx_jobs_embeddings ON job_listings USING ivfflat (embeddings vector_cosine_ops) WITH (lists = 100);
+-- idx_jobs_embeddings requires pgvector extension; re-enable when pgvector is installed
 
 -- Full text search materialized column
 ALTER TABLE job_listings ADD COLUMN search_vector tsvector

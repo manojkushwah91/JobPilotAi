@@ -103,7 +103,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <RecentActivity
-              activities={(activityData?.data as { activities?: unknown[] })?.activities as any[] | undefined}
+              activities={(activityData?.data?.activities ?? []) as { id: string; type: 'resume' | 'application' | 'interview' | 'company' | 'job'; title: string; description: string; timestamp: string }[]}
               loading={activityLoading}
             />
           </CardContent>

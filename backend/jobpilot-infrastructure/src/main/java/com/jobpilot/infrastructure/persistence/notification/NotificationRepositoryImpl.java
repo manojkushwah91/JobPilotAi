@@ -41,4 +41,9 @@ public class NotificationRepositoryImpl implements NotificationRepository {
     public long countUnreadByUserId(UUID userId) {
         return jpaRepository.countByUserIdAndStatus(userId, "PENDING");
     }
+
+    @Override
+    public void markAllReadByUserId(UUID userId) {
+        jpaRepository.markAllReadByUserId(userId, java.time.Instant.now());
+    }
 }

@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useApiQuery, useApiMutation } from '@/lib/hooks/useQuery';
+import { apiPost } from '@/lib/api/client';
 import { API } from '@/lib/api/endpoints';
 import type { JobListing, Pagination } from '@/types';
 import { JobCard } from '@/components/features/jobs/JobCard';
@@ -19,6 +21,7 @@ interface JobsResponse {
 }
 
 export default function JobsPage() {
+  const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [page, setPage] = useState(0);
   const [filters, setFilters] = useState({
@@ -51,13 +54,14 @@ export default function JobsPage() {
     params
   );
 
-  const saveMutation = useApiMutation<void, void>('POST', '', {
-    onSuccess: () => toast.success('Job saved'),
-    onError: () => toast.error('Failed to save job'),
-  });
-
-  const handleSave = (id: string) => {
-    saveMutation.mutate();
+  const handleSave = async (id: string) => {
+    try {
+      await apiPost(API.jobs.save(id));
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      toast.success('Job saved');
+    } catch {
+      toast.error('Failed to save job');
+    }
   };
 
   const jobs = data?.data?.content ?? [];

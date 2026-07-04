@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApiQuery, useApiMutation } from '@/lib/hooks/useQuery';
 import { API } from '@/lib/api/endpoints';
 import { Button } from '@/components/ui/button';
@@ -78,10 +78,12 @@ export default function ProfileSettingsPage() {
   }
 
   const profile = res!.data;
-  if (!initialized) {
-    setForm({ name: profile.name ?? '', email: profile.email ?? '' });
-    setInitialized(true);
-  }
+  useEffect(() => {
+    if (!initialized && profile) {
+      setForm({ name: profile.name ?? '', email: profile.email ?? '' });
+      setInitialized(true);
+    }
+  }, [profile, initialized]);
 
   const handleSave = () => {
     if (!form.name.trim()) {

@@ -42,7 +42,7 @@ class AuthenticateUserServiceTest {
     void shouldAuthenticateSuccessfully() {
         var email = Email.from("test@example.com");
         var hash = PasswordHash.from("$2a$12$ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx123");
-        var user = User.register(email, hash);
+        var user = User.register(email, "Test User", hash);
 
         when(userRepository.findByEmail(any())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(any(), any())).thenReturn(true);
@@ -70,7 +70,7 @@ class AuthenticateUserServiceTest {
     void shouldRejectWrongPassword() {
         var email = Email.from("test@example.com");
         var hash = PasswordHash.from("$2a$12$ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx123");
-        var user = User.register(email, hash);
+        var user = User.register(email, "Test User", hash);
 
         when(userRepository.findByEmail(any())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches(any(), any())).thenReturn(false);

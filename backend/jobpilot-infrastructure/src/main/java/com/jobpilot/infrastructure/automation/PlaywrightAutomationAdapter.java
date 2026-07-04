@@ -75,6 +75,31 @@ public class PlaywrightAutomationAdapter implements PlaywrightAutomationPort, Di
     }
 
     @Override
+    public void waitForTimeout(int millis) {
+        ensurePage();
+        page.waitForTimeout(millis);
+    }
+
+    @Override
+    public String getHtml() {
+        ensurePage();
+        return page.content();
+    }
+
+    @Override
+    public String evaluate(String script) {
+        ensurePage();
+        var result = page.evaluate(script);
+        return result != null ? result.toString() : "";
+    }
+
+    @Override
+    public String getCurrentUrl() {
+        ensurePage();
+        return page.url();
+    }
+
+    @Override
     public void closeBrowser() {
         log.info("Closing browser");
         if (page != null) { page.close(); page = null; }

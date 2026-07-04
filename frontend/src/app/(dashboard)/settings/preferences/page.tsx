@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApiQuery, useApiMutation } from '@/lib/hooks/useQuery';
 import { API } from '@/lib/api/endpoints';
 import { Button } from '@/components/ui/button';
@@ -83,15 +83,17 @@ export default function PreferencesSettingsPage() {
   }
 
   const prefs = res!.data;
-  if (!initialized) {
-    setForm({
-      desiredRoles: prefs.desiredRoles ?? [],
-      preferredLocations: prefs.preferredLocations ?? [],
-      remotePreference: prefs.remotePreference ?? false,
-      employmentTypes: prefs.employmentTypes ?? [],
-    });
-    setInitialized(true);
-  }
+  useEffect(() => {
+    if (!initialized && prefs) {
+      setForm({
+        desiredRoles: prefs.desiredRoles ?? [],
+        preferredLocations: prefs.preferredLocations ?? [],
+        remotePreference: prefs.remotePreference ?? false,
+        employmentTypes: prefs.employmentTypes ?? [],
+      });
+      setInitialized(true);
+    }
+  }, [prefs, initialized]);
 
   const addRole = () => {
     const trimmed = roleInput.trim();

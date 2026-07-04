@@ -6,12 +6,16 @@ import com.jobpilot.application.ai.dto.*;
 import com.jobpilot.application.ai.ports.AiProviderPort;
 import com.jobpilot.application.ai.ports.AiResumeScoringPort;
 import com.jobpilot.application.ai.ports.PromptTemplateRepository;
+import com.jobpilot.application.resume.ports.ResumeRepository;
+import com.jobpilot.domain.resume.ResumeId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class AiResumeScoringService implements AiResumeScoringPort {
@@ -21,22 +25,51 @@ public class AiResumeScoringService implements AiResumeScoringPort {
 
     private final AiProviderPort aiProvider;
     private final PromptTemplateRepository promptTemplateRepository;
+    private final ResumeRepository resumeRepository;
 
-    public AiResumeScoringService(AiProviderPort aiProvider, PromptTemplateRepository promptTemplateRepository) {
+    public AiResumeScoringService(AiProviderPort aiProvider,
+                                  PromptTemplateRepository promptTemplateRepository,
+                                  ResumeRepository resumeRepository) {
         this.aiProvider = aiProvider;
         this.promptTemplateRepository = promptTemplateRepository;
+        this.resumeRepository = resumeRepository;
     }
 
     @Override
+    @Transactional
     public AiResumeScoreResponse scoreResume(AiResumeScoreRequest request) {
+        var resumeId = ResumeId.from(UUID.fromString(request.resumeId()));
+        var resume = resumeRepository.findById(resumeId)
+            .orElseThrow(() -> new IllegalArgumentException("Resume not found: " + request.resumeId()));
+
+        var sectionsText = new StringBuilder();
+        for (var section : resume.sections()) {
+            sectionsText.append(section.type()).append(": ")
+                .append(section.content()).append("\n");
+        }
+
         var template = promptTemplateRepository.findActiveByUseCase("resume_scoring")
-            .orElseThrow(() -> new IllegalStateException("No active resume_scoring prompt template"));
-        var userPrompt = template.userPromptTemplate()
-            .replace("{{resumeId}}", request.resumeId())
-            .replace("{{jobDescription}}", request.jobDescription() != null ? request.jobDescription() : "");
-        var result = aiProvider.executePrompt(template.systemPrompt(), userPrompt,
-            template.model(), template.temperature(), template.maxTokens());
-        return parseScore(result);
+            .orElse(null);
+
+        String result;
+        if (template != null) {
+            var userPrompt = template.userPromptTemplate()
+                .replace("{{resumeContent}}", sectionsText.toString())
+                .replace("{{jobDescription}}", request.jobDescription() != null ? request.jobDescription() : "");
+            result = aiProvider.executePrompt(template.systemPrompt(), userPrompt,
+                template.model(), template.temperature(), template.maxTokens());
+        } else {
+            var systemPrompt = "You are an expert ATS resume scorer. Analyze the resume against the job description and return a JSON object with atsScore (0-100), scoreBreakdown (object), missingKeywords (array), strengths (array), and improvements (array).";
+            var userPrompt = "Resume:\n" + sectionsText + "\n\nJob Description:\n" + (request.jobDescription() != null ? request.jobDescription() : "No job description provided. Score based on general resume quality.");
+            result = aiProvider.executePrompt(systemPrompt, userPrompt, null, 0.3, 2000);
+        }
+
+        var scoreResponse = parseScore(result);
+
+        resume.updateAtsScore(scoreResponse.atsScore(), scoreResponse.scoreBreakdown());
+        resumeRepository.save(resume);
+
+        return scoreResponse;
     }
 
     @SuppressWarnings("unchecked")

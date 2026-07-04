@@ -11,6 +11,7 @@ public class CoverLetter extends BaseAggregateRoot {
     private UserId userId;
     private String title;
     private String companyName;
+    private String jobTitle;
     private String content;
     private String tone;
     private String recipientName;
@@ -37,12 +38,13 @@ public class CoverLetter extends BaseAggregateRoot {
     }
 
     public static CoverLetter reconstitute(CoverLetterId coverLetterId, UserId userId,
-                                            String title, String companyName, String content,
+                                            String title, String companyName, String jobTitle, String content,
                                             String tone, String recipientName, boolean aiGenerated,
                                             boolean deleted, Instant deletedAt,
                                             Instant createdAt, Instant updatedAt) {
         var cl = new CoverLetter(coverLetterId, userId, title);
         cl.companyName = companyName;
+        cl.jobTitle = jobTitle;
         cl.content = content;
         cl.tone = tone;
         cl.recipientName = recipientName;
@@ -88,6 +90,7 @@ public class CoverLetter extends BaseAggregateRoot {
     public UserId userId() { return userId; }
     public String title() { return title; }
     public String companyName() { return companyName; }
+    public String jobTitle() { return jobTitle; }
     public String content() { return content; }
     public String tone() { return tone; }
     public String recipientName() { return recipientName; }

@@ -14,7 +14,9 @@ import com.jobpilot.interfaces.rest.annotation.RateLimited;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -104,6 +106,23 @@ public class CoverLetterController {
         coverLetter.softDelete();
         coverLetterRepository.save(coverLetter);
         return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @RateLimited(capacity = 50)
+    @GetMapping("/{id}/export")
+    public ResponseEntity<byte[]> export(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "pdf") String format) {
+        var coverLetterId = CoverLetterId.from(UUID.fromString(id));
+        var coverLetter = coverLetterRepository.findById(coverLetterId)
+            .orElseThrow(() -> new NotFoundException("CoverLetter", id));
+        var content = coverLetter.content() != null ? coverLetter.content().getBytes() : new byte[0];
+        var filename = coverLetter.title() != null ? coverLetter.title().replaceAll("\\s+", "_") : "cover_letter";
+        var disposition = "attachment; filename=\"" + filename + "." + format + "\"";
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, disposition)
+            .contentType(MediaType.APPLICATION_PDF)
+            .body(content);
     }
 
     public record GenerateRequest(

@@ -1,0 +1,46 @@
+[INFO] Scanning for projects...
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Build Order:
+[INFO] 
+[INFO] JobPilot AI — Backend                                              [pom]
+[INFO] JobPilot — Common                                                  [jar]
+[INFO] JobPilot — Domain                                                  [jar]
+[INFO] JobPilot — Application                                             [jar]
+[INFO] JobPilot — Infrastructure                                          [jar]
+[INFO] JobPilot — Interfaces                                              [jar]
+[INFO] JobPilot — Bootstrap                                               [jar]
+[INFO] 
+[INFO] -------------------< com.jobpilot:jobpilot-backend >--------------------
+[INFO] Building JobPilot AI — Backend 1.0.0-SNAPSHOT                      [1/7]
+[INFO]   from pom.xml
+[INFO] --------------------------------[ pom ]---------------------------------
+[INFO] 
+[INFO] >>> spring-boot:3.3.5:run (default-cli) > test-compile @ jobpilot-backend >>>
+[INFO] 
+[INFO] <<< spring-boot:3.3.5:run (default-cli) < test-compile @ jobpilot-backend <<<
+[INFO] 
+[INFO] 
+[INFO] --- spring-boot:3.3.5:run (default-cli) @ jobpilot-backend ---
+[INFO] ------------------------------------------------------------------------
+[INFO] Reactor Summary for JobPilot AI — Backend 1.0.0-SNAPSHOT:
+[INFO] 
+[INFO] JobPilot AI — Backend .............................. FAILURE [  0.772 s]
+[INFO] JobPilot — Common .................................. SKIPPED
+[INFO] JobPilot — Domain .................................. SKIPPED
+[INFO] JobPilot — Application ............................. SKIPPED
+[INFO] JobPilot — Infrastructure .......................... SKIPPED
+[INFO] JobPilot — Interfaces .............................. SKIPPED
+[INFO] JobPilot — Bootstrap ............................... SKIPPED
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  2.007 s
+[INFO] Finished at: 2026-07-04T18:21:38+05:30
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.springframework.boot:spring-boot-maven-plugin:3.3.5:run (default-cli) on project jobpilot-backend: Unable to find a suitable main class, please add a 'mainClass' property -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException

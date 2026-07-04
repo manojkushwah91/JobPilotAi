@@ -22,7 +22,9 @@ apiClient.interceptors.response.use(
   async (error: AxiosError<ApiResponse<unknown>>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Skip 401 handling for auth endpoints (login, register, forgot-password)
+    const isAuthEndpoint = originalRequest.url?.includes('/auth/');
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
       try {
         const refreshToken = localStorage.getItem('refreshToken');
@@ -35,12 +37,15 @@ apiClient.interceptors.response.use(
 
         if (data.data?.accessToken) {
           localStorage.setItem('accessToken', data.data.accessToken);
+          document.cookie = `accessToken=${data.data.accessToken}; path=/; max-age=900; SameSite=Lax`;
           originalRequest.headers.Authorization = `Bearer ${data.data.accessToken}`;
           return apiClient(originalRequest);
         }
       } catch {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
+        document.cookie = 'accessToken=; path=/; max-age=0';
+        document.cookie = 'refreshToken=; path=/; max-age=0';
         if (typeof window !== 'undefined') {
           window.location.href = '/login';
         }

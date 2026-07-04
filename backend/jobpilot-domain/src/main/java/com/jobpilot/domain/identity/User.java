@@ -13,6 +13,7 @@ import java.util.UUID;
 public class User extends BaseAggregateRoot {
 
     private final UserId userId;
+    private String name;
     private Email email;
     private PasswordHash passwordHash;
     private Role role;
@@ -24,9 +25,10 @@ public class User extends BaseAggregateRoot {
     private final Instant createdAt;
     private Instant updatedAt;
 
-    private User(UserId userId, Email email, PasswordHash passwordHash, Role role) {
+    private User(UserId userId, String name, Email email, PasswordHash passwordHash, Role role) {
         super(userId.value());
         this.userId = userId;
+        this.name = name;
         this.email = email;
         this.passwordHash = passwordHash;
         this.role = role;
@@ -39,18 +41,18 @@ public class User extends BaseAggregateRoot {
         this.updatedAt = Instant.now();
     }
 
-    public static User register(Email email, PasswordHash passwordHash) {
+    public static User register(Email email, String name, PasswordHash passwordHash) {
         var userId = UserId.generate();
-        var user = new User(userId, email, passwordHash, Role.FREE);
+        var user = new User(userId, name, email, passwordHash, Role.FREE);
         user.registerEvent(new UserRegisteredEvent(userId, email, Role.FREE));
         return user;
     }
 
-    public static User reconstitute(UUID id, UserId userId, Email email, PasswordHash passwordHash,
+    public static User reconstitute(UUID id, UserId userId, String name, Email email, PasswordHash passwordHash,
                                      Role role, boolean emailVerified, Instant emailVerifiedAt,
                                      Set<OAuthProvider> oauthProviders, boolean deleted,
                                      Instant deletedAt, Instant createdAt, Instant updatedAt) {
-        var user = new User(userId, email, passwordHash, role);
+        var user = new User(userId, name, email, passwordHash, role);
         user.emailVerified = emailVerified;
         user.emailVerifiedAt = emailVerifiedAt;
         user.oauthProviders.addAll(oauthProviders);
@@ -97,6 +99,7 @@ public class User extends BaseAggregateRoot {
     }
 
     public UserId userId() { return userId; }
+    public String name() { return name; }
     public Email email() { return email; }
     public PasswordHash passwordHash() { return passwordHash; }
     public Role role() { return role; }
