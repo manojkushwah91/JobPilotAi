@@ -80,11 +80,14 @@ public class UserEntity extends BaseJpaEntity {
     public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }
     public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
     public Role getRole() { return role; }
+    public void setRole(Role role) { this.role = role; }
     public String getTier() { return tier; }
     public boolean isEmailVerified() { return emailVerified; }
     public Instant getEmailVerifiedAt() { return emailVerifiedAt; }
     public Instant getLastLoginAt() { return lastLoginAt; }
     public Instant getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(Instant deletedAt) { this.deletedAt = deletedAt; }
     public String getLocale() { return locale; }
 }

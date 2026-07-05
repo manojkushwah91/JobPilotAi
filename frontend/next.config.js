@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'logo.clearbit.com' },
@@ -12,6 +13,18 @@ const nextConfig = {
   },
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/api/v1/agent/:path*',
+        destination: 'http://localhost:8080/api/v1/agent/:path*',
+      },
+      {
+        source: '/ws/:path*',
+        destination: 'http://localhost:8080/ws/:path*',
+      },
+    ];
   },
   headers: async () => [
     {

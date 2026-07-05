@@ -19,6 +19,8 @@ import {
   Loader2,
 } from 'lucide-react';
 import { CaptchaOverlay } from '@/components/features/automation/CaptchaOverlay';
+import { agentGet, agentPost, API } from '@/lib/api/agent-client';
+import { useAuth } from '@/lib/auth/AuthProvider';
 
 interface AutomationStatus {
   running: boolean;
@@ -54,6 +56,7 @@ interface ApplicationResult {
 }
 
 export default function AutomationDashboard() {
+  const { user } = useAuth();
   const [status, setStatus] = useState<AutomationStatus | null>(null);
   const [progressEvents, setProgressEvents] = useState<ProgressEvent[]>([]);
   const [results, setResults] = useState<ApplicationResult[]>([]);
@@ -68,11 +71,8 @@ export default function AutomationDashboard() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const response = await fetch('/api/v1/agent/automate/status');
-      if (response.ok) {
-        const data = await response.json();
-        setStatus(data);
-      }
+      const data = await agentGet<AutomationStatus>(API.agent.automateStatus);
+      setStatus(data);
     } catch (error) {
       console.error('Failed to fetch automation status:', error);
     } finally {
@@ -82,19 +82,15 @@ export default function AutomationDashboard() {
 
   const fetchResults = useCallback(async () => {
     try {
-      const response = await fetch('/api/v1/agent/automate/results');
-      if (response.ok) {
-        const data = await response.json();
-        setResults(data);
-      }
+      const data = await agentGet<ApplicationResult[]>(API.agent.automateResults);
+      setResults(data);
     } catch (error) {
       console.error('Failed to fetch results:', error);
     }
   }, []);
 
   const connectWebSocket = useCallback(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/automation`;
+    const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080'}/ws/automation`;
 
     try {
       const ws = new WebSocket(wsUrl);
@@ -150,19 +146,13 @@ export default function AutomationDashboard() {
     if (!selectedBoard) return;
 
     try {
-      const response = await fetch('/api/v1/agent/automate/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          boardName: selectedBoard,
-          credentials: credentials.username ? credentials : {},
-          userId: 'current',
-        }),
+      await agentPost(API.agent.automateStart, {
+        boardName: selectedBoard,
+        credentials: credentials.username ? credentials : {},
+        userId: user?.id || '',
       });
-      if (response.ok) {
-        fetchStatus();
-        setShowLoginForm(false);
-      }
+      fetchStatus();
+      setShowLoginForm(false);
     } catch (error) {
       console.error('Failed to start automation:', error);
     }
@@ -170,7 +160,7 @@ export default function AutomationDashboard() {
 
   const stopAutomation = async () => {
     try {
-      await fetch('/api/v1/agent/automate/stop', { method: 'POST' });
+      await agentPost(API.agent.automateStop);
       fetchStatus();
     } catch (error) {
       console.error('Failed to stop automation:', error);

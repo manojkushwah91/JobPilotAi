@@ -4,6 +4,7 @@ import com.jobpilot.application.job.dto.*;
 import com.jobpilot.application.job.service.JobMatchingService;
 import com.jobpilot.application.job.usecase.*;
 import com.jobpilot.common.model.ApiResponse;
+import com.jobpilot.infrastructure.persistence.job.JobListingJpaRepository;
 import com.jobpilot.infrastructure.security.JwtPrincipal;
 import com.jobpilot.interfaces.rest.annotation.RateLimited;
 import jakarta.validation.Valid;
@@ -28,17 +29,20 @@ public class JobController {
     private final GetJobUseCase getJobUseCase;
     private final SearchJobsUseCase searchJobsUseCase;
     private final JobMatchingService jobMatchingService;
+    private final JobListingJpaRepository jobListingJpaRepository;
 
     public JobController(CreateJobUseCase createJobUseCase, UpdateJobUseCase updateJobUseCase,
                           DeleteJobUseCase deleteJobUseCase, GetJobUseCase getJobUseCase,
                           SearchJobsUseCase searchJobsUseCase,
-                          JobMatchingService jobMatchingService) {
+                          JobMatchingService jobMatchingService,
+                          JobListingJpaRepository jobListingJpaRepository) {
         this.createJobUseCase = createJobUseCase;
         this.updateJobUseCase = updateJobUseCase;
         this.deleteJobUseCase = deleteJobUseCase;
         this.getJobUseCase = getJobUseCase;
         this.searchJobsUseCase = searchJobsUseCase;
         this.jobMatchingService = jobMatchingService;
+        this.jobListingJpaRepository = jobListingJpaRepository;
     }
 
     @RateLimited(capacity = 100)
@@ -141,11 +145,40 @@ public class JobController {
     @RateLimited(capacity = 100)
     @GetMapping("/facets")
     public ResponseEntity<ApiResponse<Map<String, Object>>> facets() {
+        var allJobs = jobListingJpaRepository.findAll().stream()
+            .map(com.jobpilot.infrastructure.persistence.job.JobListingEntity::toDomain).toList();
+        var employmentTypes = allJobs.stream()
+            .map(j -> j.employmentType())
+            .filter(e -> e != null)
+            .map(Enum::name)
+            .distinct().sorted().toList();
+        var experienceLevels = allJobs.stream()
+            .map(j -> j.experienceLevel())
+            .filter(e -> e != null)
+            .map(Enum::name)
+            .distinct().sorted().toList();
+        var industries = allJobs.stream()
+            .map(j -> j.industry())
+            .filter(i -> i != null && !i.isBlank())
+            .distinct().sorted().toList();
+        var locations = allJobs.stream()
+            .map(j -> j.location())
+            .filter(l -> l != null)
+            .map(l -> {
+                var city = l.get("city");
+                var country = l.get("country");
+                if (city != null && country != null) return city + ", " + country;
+                if (city != null) return city.toString();
+                if (country != null) return country.toString();
+                return l.toString();
+            })
+            .filter(loc -> loc != null && !loc.isBlank())
+            .distinct().sorted().toList();
         return ResponseEntity.ok(ApiResponse.ok(Map.of(
-            "employmentTypes", List.of("FULL_TIME", "PART_TIME", "CONTRACT", "INTERNSHIP", "TEMPORARY"),
-            "experienceLevels", List.of("ENTRY", "JUNIOR", "MID", "SENIOR", "LEAD", "EXECUTIVE"),
-            "industries", List.of(),
-            "locations", List.of(),
+            "employmentTypes", employmentTypes,
+            "experienceLevels", experienceLevels,
+            "industries", industries,
+            "locations", locations,
             "salaryRanges", List.of(Map.of("min", 0, "max", 50000), Map.of("min", 50000, "max", 100000),
                 Map.of("min", 100000, "max", 150000), Map.of("min", 150000, "max", 200000))
         )));
@@ -154,9 +187,34 @@ public class JobController {
     @RateLimited(capacity = 100)
     @GetMapping("/aggregate")
     public ResponseEntity<ApiResponse<Map<String, Object>>> aggregate() {
+        var allJobs = jobListingJpaRepository.findAll().stream()
+            .map(com.jobpilot.infrastructure.persistence.job.JobListingEntity::toDomain).toList();
+        long totalJobs = allJobs.size();
+        var bySource = new java.util.HashMap<String, Long>();
+        var byIndustry = new java.util.HashMap<String, Long>();
+        var byEmploymentType = new java.util.HashMap<String, Long>();
+        var salarySum = new java.util.concurrent.atomic.AtomicLong(0);
+        var salaryCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        for (var job : allJobs) {
+            bySource.merge(job.source(), 1L, Long::sum);
+            if (job.industry() != null && !job.industry().isBlank()) {
+                byIndustry.merge(job.industry(), 1L, Long::sum);
+            }
+            if (job.employmentType() != null) {
+                byEmploymentType.merge(job.employmentType().name(), 1L, Long::sum);
+            }
+            if (job.salary() != null) {
+                var max = job.salary().get("max");
+                if (max instanceof Number) {
+                    salarySum.addAndGet(((Number) max).longValue());
+                    salaryCount.incrementAndGet();
+                }
+            }
+        }
+        long avgSalary = salaryCount.get() > 0 ? salarySum.get() / salaryCount.get() : 0;
         return ResponseEntity.ok(ApiResponse.ok(Map.of(
-            "totalJobs", 0, "bySource", Map.of(), "byIndustry", Map.of(),
-            "byEmploymentType", Map.of(), "avgSalary", 0
+            "totalJobs", totalJobs, "bySource", bySource, "byIndustry", byIndustry,
+            "byEmploymentType", byEmploymentType, "avgSalary", avgSalary
         )));
     }
 

@@ -1,6 +1,8 @@
 package com.jobpilot.infrastructure.persistence.agent;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -9,7 +11,6 @@ import java.util.UUID;
 public class MissionJpaEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @Column(name = "user_id", nullable = false)
@@ -77,7 +78,8 @@ public class MissionJpaEntity {
     @Column(name = "total_pending")
     private int totalPending;
 
-    @Column(name = "metadata")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "metadata", columnDefinition = "jsonb")
     private String metadata;
 
     @Column(name = "created_at", nullable = false)

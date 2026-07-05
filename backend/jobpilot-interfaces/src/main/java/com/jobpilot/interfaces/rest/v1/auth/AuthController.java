@@ -30,9 +30,11 @@ import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.beans.factory.annotation.Value;
 import java.util.Map;
 import java.util.UUID;
 
@@ -41,6 +43,9 @@ import java.util.UUID;
 public class AuthController {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
+
+    @Value("${app.frontend-url:http://localhost:3000}")
+    private String frontendUrl;
 
     private final RegisterUserUseCase registerUserUseCase;
     private final AuthenticateUserUseCase authenticateUserUseCase;
@@ -135,7 +140,7 @@ public class AuthController {
             try {
                 emailSender.sendWithTemplate(request.email(), "password-reset", Map.of(
                     "name", user.email().value().split("@")[0],
-                    "resetLink", "http://localhost:3000/reset-password?token=" + token
+                    "resetLink", frontendUrl + "/reset-password?token=" + token
                 ));
             } catch (Exception e) {
                 logger.warn("Failed to send password-reset email to {}: {}", request.email(), e.getMessage());
@@ -206,7 +211,10 @@ public class AuthController {
     public ResponseEntity<ApiResponse<AuthResponse>> handleOAuthCallback(
             @PathVariable String provider,
             @RequestParam String code,
-            @RequestParam(defaultValue = "http://localhost:3000/auth/callback") String redirectUri) {
+            @RequestParam(defaultValue = "") String redirectUri) {
+        if (redirectUri.isEmpty()) {
+            redirectUri = frontendUrl + "/auth/callback";
+        }
         var response = oauthService.handleOAuthCallback(new OAuthCommand(provider, code, redirectUri));
         return ResponseEntity.ok(ApiResponse.ok(response));
     }

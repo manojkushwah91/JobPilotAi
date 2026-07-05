@@ -6,6 +6,8 @@ import com.jobpilot.domain.job.JobId;
 import com.jobpilot.domain.job.JobListing;
 import com.jobpilot.infrastructure.persistence.shared.BaseJpaEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.List;
@@ -23,21 +25,35 @@ public class JobListingEntity extends BaseJpaEntity {
     @Column(name = "company_name", nullable = false) private String companyName;
     @Column(name = "company_logo_url") private String companyLogoUrl;
     @Column(name = "company_id") private UUID companyId;
-    @Column(name = "location", columnDefinition = "jsonb") private String location;
-    @Column(name = "salary", columnDefinition = "jsonb") private String salary;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(name = "location", columnDefinition = "jsonb") private String location;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(name = "salary", columnDefinition = "jsonb") private String salary;
     @Column(name = "description", nullable = false, columnDefinition = "text") private String description;
-    @Column(name = "requirements", columnDefinition = "jsonb") private String requirements;
-    @Column(name = "responsibilities", columnDefinition = "jsonb") private String responsibilities;
-    @Column(name = "benefits", columnDefinition = "jsonb") private String benefits;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(name = "requirements", columnDefinition = "jsonb") private String requirements;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(name = "responsibilities", columnDefinition = "jsonb") private String responsibilities;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(name = "benefits", columnDefinition = "jsonb") private String benefits;
     @Enumerated(EnumType.STRING) @Column(name = "employment_type") private EmploymentType employmentType;
     @Enumerated(EnumType.STRING) @Column(name = "experience_level") private ExperienceLevel experienceLevel;
     @Column(name = "industry") private String industry;
-    @Column(name = "skills", columnDefinition = "jsonb") private String skills;
+    @JdbcTypeCode(SqlTypes.JSON) @Column(name = "skills", columnDefinition = "jsonb") private String skills;
     @Column(name = "application_url") private String applicationUrl;
     @Column(name = "posted_at") private Instant postedAt;
     @Column(name = "is_active", nullable = false) private boolean isActive;
 
     protected JobListingEntity() {}
+
+    public UUID getId() { return id; }
+    public String getSource() { return source; }
+    public String getTitle() { return title; }
+    public String getCompanyName() { return companyName; }
+    public UUID getCompanyId() { return companyId; }
+    public String getLocation() { return location; }
+    public Object getSalary() { return salary; }
+    public String getDescription() { return description; }
+    public EmploymentType getEmploymentType() { return employmentType; }
+    public ExperienceLevel getExperienceLevel() { return experienceLevel; }
+    public String getIndustry() { return industry; }
+    public String getSkills() { return skills; }
+    public boolean isActive() { return isActive; }
 
     public static JobListingEntity fromDomain(JobListing job) {
         var e = new JobListingEntity();

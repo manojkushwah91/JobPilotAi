@@ -46,7 +46,7 @@ export default function SavedJobsPage() {
             </Link>
             <h1 className="text-2xl font-bold">Saved Jobs</h1>
           </div>
-          <p className="text-sm text-muted-foreground">Jobs you've bookmarked for later</p>
+          <p className="text-sm text-muted-foreground">Jobs you&apos;ve bookmarked for later</p>
         </div>
       </div>
 

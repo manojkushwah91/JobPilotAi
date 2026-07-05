@@ -4,6 +4,8 @@ import com.jobpilot.domain.resume.ResumeSection;
 import com.jobpilot.domain.resume.ResumeSectionType;
 import com.jobpilot.infrastructure.persistence.shared.BaseJpaEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.Map;
 import java.util.UUID;
@@ -26,6 +28,7 @@ public class ResumeSectionEntity extends BaseJpaEntity {
     @Column(name = "title")
     private String title;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "content", columnDefinition = "jsonb", nullable = false)
     private String content;
 

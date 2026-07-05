@@ -4,6 +4,8 @@ import com.jobpilot.domain.questionbank.QuestionBankEntry;
 import com.jobpilot.domain.questionbank.QuestionBankId;
 import com.jobpilot.infrastructure.persistence.shared.BaseJpaEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.List;
 import java.util.UUID;
@@ -30,6 +32,7 @@ public class QuestionBankEntryEntity extends BaseJpaEntity {
     @Column(name = "expected_answer", columnDefinition = "text")
     private String expectedAnswer;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "tags", columnDefinition = "jsonb")
     private String tags;
 

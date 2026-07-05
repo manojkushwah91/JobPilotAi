@@ -33,46 +33,8 @@ const activityColors: Record<Activity['type'], string> = {
   job: 'bg-cyan-500/10 text-cyan-500',
 };
 
-const defaultActivities: Activity[] = [
-  {
-    id: '1',
-    type: 'resume',
-    title: 'Resume uploaded',
-    description: 'Software Engineer Resume v3',
-    timestamp: '2 hours ago',
-  },
-  {
-    id: '2',
-    type: 'application',
-    title: 'Application submitted',
-    description: 'Senior Frontend Developer at Google',
-    timestamp: '5 hours ago',
-  },
-  {
-    id: '3',
-    type: 'interview',
-    title: 'Interview scheduled',
-    description: 'Technical interview with Stripe',
-    timestamp: '1 day ago',
-  },
-  {
-    id: '4',
-    type: 'job',
-    title: 'Job match found',
-    description: 'Staff Engineer at OpenAI (92% match)',
-    timestamp: '2 days ago',
-  },
-  {
-    id: '5',
-    type: 'company',
-    title: 'Company saved',
-    description: 'Anthropic added to tracked companies',
-    timestamp: '3 days ago',
-  },
-];
-
 export default function RecentActivity({ activities, loading }: RecentActivityProps) {
-  const items = activities ?? defaultActivities;
+  const items = activities ?? [];
 
   if (loading) {
     return (

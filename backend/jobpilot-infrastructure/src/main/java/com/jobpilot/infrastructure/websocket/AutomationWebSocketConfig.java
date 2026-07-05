@@ -12,6 +12,7 @@ import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.web.socket.server.standard.ServletServerContainerFactoryBean;
 
 import java.io.IOException;
@@ -21,6 +22,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 @Configuration
 @EnableWebSocket
+@Profile("!test")
 public class AutomationWebSocketConfig implements WebSocketConfigurer {
 
     @Override

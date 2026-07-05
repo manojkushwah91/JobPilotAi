@@ -6,6 +6,8 @@ import com.jobpilot.domain.automation.AutomationSessionId;
 import com.jobpilot.domain.automation.AutomationStatus;
 import com.jobpilot.infrastructure.persistence.shared.BaseJpaEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.List;
@@ -21,6 +23,7 @@ public class AutomationSessionEntity extends BaseJpaEntity {
     @Column(name = "status", nullable = false) private String status;
     @Column(name = "step") private String currentStep;
     @Column(name = "progress") private int progress;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "screenshots", columnDefinition = "jsonb") private String screenshots;
     @Column(name = "error_message", columnDefinition = "text") private String errorMessage;
     @Column(name = "started_at") private Instant startedAt;

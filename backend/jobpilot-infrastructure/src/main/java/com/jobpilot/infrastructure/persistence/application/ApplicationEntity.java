@@ -8,6 +8,8 @@ import com.jobpilot.domain.job.JobId;
 import com.jobpilot.domain.resume.ResumeId;
 import com.jobpilot.infrastructure.persistence.shared.BaseJpaEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.List;
@@ -24,13 +26,21 @@ public class ApplicationEntity extends BaseJpaEntity {
     @Column(name = "resume_id") private UUID resumeId;
     @Column(name = "cover_letter_id") private UUID coverLetterId;
     @Enumerated(EnumType.STRING) @Column(name = "status", nullable = false) private ApplicationStatus status;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "status_history", columnDefinition = "jsonb") private String statusHistory;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "automation_info", columnDefinition = "jsonb") private String automationInfo;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "salary_offered", columnDefinition = "jsonb") private String salaryOffered;
     @Column(name = "applied_at") private Instant appliedAt;
     @Column(name = "deleted_at") private Instant deletedAt;
 
     protected ApplicationEntity() {}
+
+    public UUID getId() { return id; }
+    public UUID getUserId() { return userId; }
+    public com.jobpilot.domain.application.ApplicationStatus getStatus() { return status; }
+    public UUID getJobListingId() { return jobListingId; }
 
     public static ApplicationEntity fromDomain(Application app) {
         var e = new ApplicationEntity();

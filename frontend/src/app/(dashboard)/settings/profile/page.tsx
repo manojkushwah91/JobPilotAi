@@ -35,6 +35,14 @@ export default function ProfileSettingsPage() {
   const [form, setForm] = useState<{ name: string; email: string }>({ name: '', email: '' });
   const [initialized, setInitialized] = useState(false);
 
+  const profile = res?.data;
+  useEffect(() => {
+    if (!initialized && profile) {
+      setForm({ name: profile.name ?? '', email: profile.email ?? '' });
+      setInitialized(true);
+    }
+  }, [profile, initialized]);
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -77,14 +85,6 @@ export default function ProfileSettingsPage() {
     );
   }
 
-  const profile = res!.data;
-  useEffect(() => {
-    if (!initialized && profile) {
-      setForm({ name: profile.name ?? '', email: profile.email ?? '' });
-      setInitialized(true);
-    }
-  }, [profile, initialized]);
-
   const handleSave = () => {
     if (!form.name.trim()) {
       toast.error('Name is required');
@@ -106,7 +106,7 @@ export default function ProfileSettingsPage() {
           <CardContent className="space-y-6">
             <div className="flex items-center gap-4">
               <Avatar className="h-20 w-20">
-                <AvatarImage src={profile.avatarUrl} alt={form.name} />
+                <AvatarImage src={profile?.avatarUrl} alt={form.name} />
                 <AvatarFallback>
                   <User className="h-8 w-8 text-muted-foreground" />
                 </AvatarFallback>

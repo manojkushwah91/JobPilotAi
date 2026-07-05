@@ -3,6 +3,8 @@ package com.jobpilot.infrastructure.persistence.notification;
 import com.jobpilot.domain.notification.*;
 import com.jobpilot.infrastructure.persistence.shared.BaseJpaEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.Map;
@@ -18,6 +20,7 @@ public class NotificationEntity extends BaseJpaEntity {
     @Column(name = "channel", nullable = false) private String channel;
     @Column(name = "title", nullable = false) private String title;
     @Column(name = "body", nullable = false, columnDefinition = "text") private String body;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb") private String metadata;
     @Column(name = "status", nullable = false) private String status;
     @Column(name = "read_at") private Instant readAt;

@@ -140,7 +140,7 @@ export function SectionEditor({
             ))}
           {sections.length === 0 && (
             <p className="py-4 text-center text-sm text-muted-foreground">
-              No sections yet. Click "Add" to begin.
+              No sections yet. Click &quot;Add&quot; to begin.
             </p>
           )}
         </div>

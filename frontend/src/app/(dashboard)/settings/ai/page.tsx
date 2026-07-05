@@ -39,6 +39,16 @@ export default function AiSettingsPage() {
   });
   const [initialized, setInitialized] = useState(false);
 
+  useEffect(() => {
+    if (!initialized && res?.data) {
+      setForm({
+        preferredProvider: res.data.preferredProvider ?? 'OPENAI',
+        model: res.data.model ?? 'gpt-4o',
+      });
+      setInitialized(true);
+    }
+  }, [res?.data, initialized]);
+
   if (isLoading) {
     return (
       <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
@@ -75,15 +85,6 @@ export default function AiSettingsPage() {
   }
 
   const settings = res!.data;
-  useEffect(() => {
-    if (!initialized && settings) {
-      setForm({
-        preferredProvider: settings.preferredProvider ?? 'OPENAI',
-        model: settings.model ?? 'gpt-4o',
-      });
-      setInitialized(true);
-    }
-  }, [settings, initialized]);
 
   const availableModels = PROVIDER_MODELS[form.preferredProvider] ?? [];
 

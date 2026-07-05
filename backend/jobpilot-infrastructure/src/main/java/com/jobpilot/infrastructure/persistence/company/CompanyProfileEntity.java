@@ -4,6 +4,8 @@ import com.jobpilot.domain.company.CompanyId;
 import com.jobpilot.domain.company.CompanyProfile;
 import com.jobpilot.infrastructure.persistence.shared.BaseJpaEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.List;
 import java.util.Map;
@@ -19,15 +21,21 @@ public class CompanyProfileEntity extends BaseJpaEntity {
     @Column(name = "website") private String website;
     @Column(name = "logo_url") private String logoUrl;
     @Column(name = "industry") private String industry;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "headquarters", columnDefinition = "jsonb") private String headquarters;
     @Column(name = "founded_year") private Integer foundedYear;
     @Column(name = "company_size_min") private Integer companySizeMin;
     @Column(name = "company_size_max") private Integer companySizeMax;
     @Column(name = "stock_symbol") private String stockSymbol;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "funding_rounds", columnDefinition = "jsonb") private String fundingRounds;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "technology_stack", columnDefinition = "jsonb") private String technologyStack;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "culture_keywords", columnDefinition = "jsonb") private String cultureKeywords;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "salary_data", columnDefinition = "jsonb") private String salaryData;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "hiring_trends", columnDefinition = "jsonb") private String hiringTrends;
 
     protected CompanyProfileEntity() {}

@@ -6,16 +6,18 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
+
 @Component
 @Primary
 public class AgentAiProviderAdapter implements AiProviderPort {
 
     private static final Logger log = LoggerFactory.getLogger(AgentAiProviderAdapter.class);
 
-    private final OllamaAiProvider ollamaProvider;
-    private final OpenAiProvider openAiProvider;
+    private final Optional<OllamaAiProvider> ollamaProvider;
+    private final Optional<OpenAiProvider> openAiProvider;
 
-    public AgentAiProviderAdapter(OllamaAiProvider ollamaProvider, OpenAiProvider openAiProvider) {
+    public AgentAiProviderAdapter(Optional<OllamaAiProvider> ollamaProvider, Optional<OpenAiProvider> openAiProvider) {
         this.ollamaProvider = ollamaProvider;
         this.openAiProvider = openAiProvider;
     }
@@ -23,17 +25,22 @@ public class AgentAiProviderAdapter implements AiProviderPort {
     @Override
     public String executePrompt(String systemPrompt, String userPrompt, String model,
                                 double temperature, int maxTokens) {
-        try {
-            return ollamaProvider.executePrompt(systemPrompt, userPrompt, model, temperature, maxTokens);
-        } catch (Exception e) {
-            log.warn("Ollama failed, falling back to OpenAI: {}", e.getMessage());
+        if (ollamaProvider.isPresent()) {
+            try {
+                return ollamaProvider.get().executePrompt(systemPrompt, userPrompt, model, temperature, maxTokens);
+            } catch (Exception e) {
+                log.warn("Ollama failed, falling back to OpenAI: {}", e.getMessage());
+            }
         }
-        try {
-            return openAiProvider.executePrompt(systemPrompt, userPrompt, model, temperature, maxTokens);
-        } catch (Exception e) {
-            log.error("All AI providers failed: {}", e.getMessage());
-            return "I'm sorry, the AI service is currently unavailable. Please try again later.";
+        if (openAiProvider.isPresent()) {
+            try {
+                return openAiProvider.get().executePrompt(systemPrompt, userPrompt, model, temperature, maxTokens);
+            } catch (Exception e) {
+                log.error("OpenAI failed: {}", e.getMessage());
+            }
         }
+        log.error("All AI providers are unavailable");
+        return "I'm sorry, the AI service is currently unavailable. Please try again later.";
     }
 
     @Override

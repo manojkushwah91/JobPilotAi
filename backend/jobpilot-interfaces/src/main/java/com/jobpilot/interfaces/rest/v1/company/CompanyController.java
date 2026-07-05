@@ -5,6 +5,7 @@ import com.jobpilot.application.company.ports.CompanyRepository;
 import com.jobpilot.application.company.usecase.*;
 import com.jobpilot.common.model.ApiResponse;
 import com.jobpilot.domain.company.CompanyId;
+import com.jobpilot.infrastructure.persistence.job.JobListingJpaRepository;
 import com.jobpilot.interfaces.rest.annotation.RateLimited;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -27,15 +28,18 @@ public class CompanyController {
     private final UpdateCompanyUseCase updateCompanyUseCase;
     private final GetCompanyUseCase getCompanyUseCase;
     private final CompanyRepository companyRepository;
+    private final JobListingJpaRepository jobListingJpaRepository;
 
     public CompanyController(CreateCompanyUseCase createCompanyUseCase,
                               UpdateCompanyUseCase updateCompanyUseCase,
                               GetCompanyUseCase getCompanyUseCase,
-                              CompanyRepository companyRepository) {
+                              CompanyRepository companyRepository,
+                              JobListingJpaRepository jobListingJpaRepository) {
         this.createCompanyUseCase = createCompanyUseCase;
         this.updateCompanyUseCase = updateCompanyUseCase;
         this.getCompanyUseCase = getCompanyUseCase;
         this.companyRepository = companyRepository;
+        this.jobListingJpaRepository = jobListingJpaRepository;
     }
 
     @RateLimited(capacity = 100)
@@ -92,9 +96,40 @@ public class CompanyController {
     @RateLimited(capacity = 100)
     @GetMapping("/{id}/salary")
     public ResponseEntity<ApiResponse<Map<String, Object>>> salary(@PathVariable String id) {
+        var company = companyRepository.findById(CompanyId.from(UUID.fromString(id)));
+        if (company.isEmpty()) {
+            return ResponseEntity.ok(ApiResponse.ok(Map.of(
+                "minSalary", 0, "maxSalary", 0, "currency", "USD",
+                "averageSalary", 0, "sampleSize", 0
+            )));
+        }
+        var companyName = company.get().name();
+        var jobs = jobListingJpaRepository.search(companyName, org.springframework.data.domain.PageRequest.of(0, 1000));
+        var salaries = jobs.getContent().stream()
+            .map(com.jobpilot.infrastructure.persistence.job.JobListingEntity::toDomain)
+            .filter(j -> j.salary() != null)
+            .map(j -> {
+                var salary = j.salary();
+                var min = salary.get("min");
+                var max = salary.get("max");
+                int minVal = min instanceof Number ? ((Number) min).intValue() : 0;
+                int maxVal = max instanceof Number ? ((Number) max).intValue() : 0;
+                return new int[]{minVal, maxVal};
+            })
+            .filter(s -> s[0] > 0 || s[1] > 0)
+            .toList();
+        if (salaries.isEmpty()) {
+            return ResponseEntity.ok(ApiResponse.ok(Map.of(
+                "minSalary", 0, "maxSalary", 0, "currency", "USD",
+                "averageSalary", 0, "sampleSize", 0
+            )));
+        }
+        int minSalary = salaries.stream().mapToInt(s -> s[0]).filter(v -> v > 0).min().orElse(0);
+        int maxSalary = salaries.stream().mapToInt(s -> s[1]).filter(v -> v > 0).max().orElse(0);
+        double avgSalary = salaries.stream().mapToDouble(s -> (s[0] + s[1]) / 2.0).average().orElse(0.0);
         return ResponseEntity.ok(ApiResponse.ok(Map.of(
-            "minSalary", 0, "maxSalary", 0, "currency", "USD",
-            "averageSalary", 0, "sampleSize", 0
+            "minSalary", minSalary, "maxSalary", maxSalary, "currency", "USD",
+            "averageSalary", Math.round(avgSalary), "sampleSize", salaries.size()
         )));
     }
 
@@ -107,10 +142,20 @@ public class CompanyController {
     @RateLimited(capacity = 100)
     @GetMapping("/{id}/hiring-trends")
     public ResponseEntity<ApiResponse<Map<String, Object>>> hiringTrends(@PathVariable String id) {
+        var company = companyRepository.findById(CompanyId.from(UUID.fromString(id)));
+        if (company.isEmpty()) {
+            return ResponseEntity.ok(ApiResponse.ok(Map.of(
+                "trend", "stable",
+                "last6Months", List.of(),
+                "growthRate", 0.0
+            )));
+        }
+        var c = company.get();
+        var trends = c.hiringTrends() != null ? c.hiringTrends() : Map.<String, Object>of();
         return ResponseEntity.ok(ApiResponse.ok(Map.of(
-            "trend", "stable",
-            "last6Months", List.of(),
-            "growthRate", 0.0
+            "trend", trends.getOrDefault("trend", "stable"),
+            "last6Months", trends.getOrDefault("last6Months", List.of()),
+            "growthRate", trends.getOrDefault("growthRate", 0.0)
         )));
     }
 

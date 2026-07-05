@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Mail, MailCheck, MailX, Calendar, Gift, HelpCircle, Loader2 } from 'lucide-react';
+import { agentGet, API } from '@/lib/api/agent-client';
 
 interface EmailEvent {
   eventId: string;
@@ -44,12 +45,12 @@ export default function EmailEventsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [eventsRes, countsRes] = await Promise.all([
-        fetch('/api/v1/agent/email/events'),
-        fetch('/api/v1/agent/email/events/counts'),
+      const [eventsData, countsData] = await Promise.all([
+        agentGet<EmailEvent[]>(API.agent.emailEvents),
+        agentGet<EventCounts>(API.agent.emailEventCounts),
       ]);
-      if (eventsRes.ok) setEvents(await eventsRes.json());
-      if (countsRes.ok) setCounts(await countsRes.json());
+      setEvents(eventsData);
+      setCounts(countsData);
     } catch (error) {
       console.error('Failed to fetch email events:', error);
     } finally {

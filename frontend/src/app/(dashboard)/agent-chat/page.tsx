@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/lib/auth/AuthProvider";
+import { agentPost, API } from "@/lib/api/agent-client";
 
 interface Message {
   id: string;
@@ -42,22 +43,17 @@ export default function AgentChat() {
     setIsTyping(true);
 
     try {
-      const response = await fetch("/api/v1/agent/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user?.id || "", message: input }),
+      const data = await agentPost<{ response: string }>(API.agent.chat, {
+        userId: user?.id || "",
+        message: input,
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        const agentMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "agent",
-          content: data.response,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, agentMessage]);
-      }
+      const agentMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "agent",
+        content: data.response,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, agentMessage]);
     } catch (error) {
       console.error("Failed to send message:", error);
     } finally {

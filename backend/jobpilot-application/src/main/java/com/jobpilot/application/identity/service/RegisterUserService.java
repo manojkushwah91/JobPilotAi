@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import com.jobpilot.domain.identity.Email;
 import com.jobpilot.domain.identity.PasswordHash;
 import com.jobpilot.domain.identity.User;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +29,9 @@ import java.util.UUID;
 public class RegisterUserService implements RegisterUserUseCase {
 
     private static final Logger logger = LoggerFactory.getLogger(RegisterUserService.class);
+
+    @Value("${app.frontend-url:http://localhost:3000}")
+    private String frontendUrl;
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -66,7 +70,7 @@ public class RegisterUserService implements RegisterUserUseCase {
         try {
             emailSender.sendWithTemplate(user.email().value(), "verify-email", Map.of(
                 "name", user.email().value().split("@")[0],
-                "verifyLink", "http://localhost:3000/verify-email?token=" + token
+                "verifyLink", frontendUrl + "/verify-email?token=" + token
             ));
         } catch (Exception e) {
             // Email sending is non-critical; registration succeeds even if mail server is unavailable

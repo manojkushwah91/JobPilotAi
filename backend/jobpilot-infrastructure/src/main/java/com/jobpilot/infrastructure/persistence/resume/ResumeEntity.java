@@ -5,6 +5,8 @@ import com.jobpilot.domain.resume.Resume;
 import com.jobpilot.domain.resume.ResumeId;
 import com.jobpilot.infrastructure.persistence.shared.BaseJpaEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -28,6 +30,7 @@ public class ResumeEntity extends BaseJpaEntity {
     @Column(name = "ats_score")
     private Integer atsScore;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "ats_score_data", columnDefinition = "jsonb")
     private String atsScoreData;
 

@@ -6,9 +6,11 @@ import com.jobpilot.domain.ai.AiUsageLogId;
 import com.jobpilot.infrastructure.persistence.ai.AiUsageLogEntity;
 import com.jobpilot.infrastructure.persistence.ai.AiUsageLogJpaRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 @Service
+@Profile("test")
 @ConditionalOnMissingBean(AiProviderPort.class)
 public class FallbackAiProvider implements AiProviderPort {
 

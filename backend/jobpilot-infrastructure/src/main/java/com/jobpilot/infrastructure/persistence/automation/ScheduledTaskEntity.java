@@ -4,6 +4,8 @@ import com.jobpilot.domain.automation.ScheduledTask;
 import com.jobpilot.domain.automation.ScheduledTaskId;
 import com.jobpilot.infrastructure.persistence.shared.BaseJpaEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -15,6 +17,7 @@ public class ScheduledTaskEntity extends BaseJpaEntity {
     @Id private UUID id;
     @Column(name = "user_id", nullable = false) private UUID userId;
     @Column(name = "task_type", nullable = false) private String taskType;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "payload", columnDefinition = "jsonb") private String payload;
     @Column(name = "status", nullable = false) private String status;
     @Column(name = "scheduled_at", nullable = false) private Instant scheduledAt;

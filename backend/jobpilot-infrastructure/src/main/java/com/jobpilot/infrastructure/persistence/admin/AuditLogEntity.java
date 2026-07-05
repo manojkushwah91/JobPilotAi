@@ -2,6 +2,8 @@ package com.jobpilot.infrastructure.persistence.admin;
 
 import com.jobpilot.infrastructure.persistence.shared.BaseJpaEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -16,6 +18,7 @@ public class AuditLogEntity extends BaseJpaEntity {
     @Column(name = "action", nullable = false) private String action;
     @Column(name = "resource_type") private String resourceType;
     @Column(name = "resource_id") private String resourceId;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "details", columnDefinition = "jsonb") private String details;
     @Column(name = "ip_address") private String ipAddress;
     @Column(name = "user_agent") private String userAgent;

@@ -4,6 +4,8 @@ import com.jobpilot.application.analytics.dto.AnalyticsResponse;
 import com.jobpilot.application.analytics.dto.DateRangeCommand;
 import com.jobpilot.application.analytics.usecase.GetAnalyticsUseCase;
 import com.jobpilot.common.model.ApiResponse;
+import com.jobpilot.infrastructure.persistence.application.ApplicationJpaRepository;
+import com.jobpilot.infrastructure.persistence.interview.InterviewSessionJpaRepository;
 import com.jobpilot.interfaces.rest.annotation.RateLimited;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -19,9 +21,15 @@ import java.util.Map;
 public class AnalyticsController {
 
     private final GetAnalyticsUseCase getAnalyticsUseCase;
+    private final ApplicationJpaRepository applicationJpaRepository;
+    private final InterviewSessionJpaRepository interviewSessionJpaRepository;
 
-    public AnalyticsController(GetAnalyticsUseCase getAnalyticsUseCase) {
+    public AnalyticsController(GetAnalyticsUseCase getAnalyticsUseCase,
+                               ApplicationJpaRepository applicationJpaRepository,
+                               InterviewSessionJpaRepository interviewSessionJpaRepository) {
         this.getAnalyticsUseCase = getAnalyticsUseCase;
+        this.applicationJpaRepository = applicationJpaRepository;
+        this.interviewSessionJpaRepository = interviewSessionJpaRepository;
     }
 
     @RateLimited(capacity = 20)
@@ -63,14 +71,17 @@ public class AnalyticsController {
     @GetMapping("/application-funnel")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getApplicationFunnel(
             @RequestParam(defaultValue = "30d") String period) {
-        return ResponseEntity.ok(ApiResponse.ok(List.of(
-            Map.of("stage", "SAVED", "count", 0),
-            Map.of("stage", "APPLIED", "count", 0),
-            Map.of("stage", "SCREENING", "count", 0),
-            Map.of("stage", "INTERVIEW", "count", 0),
-            Map.of("stage", "OFFER", "count", 0),
-            Map.of("stage", "REJECTED", "count", 0)
-        )));
+        var all = applicationJpaRepository.findAll();
+        var statusCounts = new java.util.HashMap<String, Long>();
+        for (var app : all) {
+            statusCounts.merge(app.getStatus().name(), 1L, Long::sum);
+        }
+        var stages = List.of("SAVED", "APPLIED", "PHONE_SCREEN", "TECHNICAL_INTERVIEW",
+            "ONSITE_INTERVIEW", "OFFER", "ACCEPTED", "REJECTED", "WITHDRAWN");
+        var funnel = stages.stream().<Map<String, Object>>map(s ->
+            Map.of("stage", s, "count", statusCounts.getOrDefault(s, 0L))
+        ).toList();
+        return ResponseEntity.ok(ApiResponse.ok(funnel));
     }
 
     @RateLimited(capacity = 20)
@@ -98,9 +109,20 @@ public class AnalyticsController {
     @RateLimited(capacity = 20)
     @GetMapping("/interview-performance")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getInterviewPerformance() {
+        var all = interviewSessionJpaRepository.findAll();
+        int totalInterviews = all.size();
+        var rated = all.stream().filter(i -> i.getRating() != null).toList();
+        double avgScore = rated.isEmpty() ? 0.0 :
+            rated.stream().mapToInt(i -> i.getRating()).average().orElse(0.0);
+        var typeCounts = new java.util.HashMap<String, Long>();
+        for (var session : all) {
+            typeCounts.merge(session.getType(), 1L, Long::sum);
+        }
         return ResponseEntity.ok(ApiResponse.ok(Map.of(
-            "totalInterviews", 0, "avgScore", 0.0,
-            "scoreDistribution", Map.of(), "performanceByType", Map.of()
+            "totalInterviews", totalInterviews,
+            "avgScore", avgScore,
+            "scoreDistribution", Map.of(),
+            "performanceByType", typeCounts
         )));
     }
 

@@ -13,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { agentGet, agentPost, API } from "@/lib/api/agent-client";
+import { useAuth } from "@/lib/auth/AuthProvider";
 
 interface Mission {
   id: string;
@@ -38,6 +40,7 @@ interface AgentStatus {
 }
 
 export default function MissionControl() {
+  const { user } = useAuth();
   const [missions, setMissions] = useState<Mission[]>([]);
   const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -62,11 +65,8 @@ export default function MissionControl() {
 
   const fetchMissions = async () => {
     try {
-      const response = await fetch("/api/v1/agent/missions/user/current");
-      if (response.ok) {
-        const data = await response.json();
-        setMissions(data);
-      }
+      const data = await agentGet<Mission[]>(API.agent.userMissions);
+      setMissions(data);
     } catch (error) {
       console.error("Failed to fetch missions:", error);
     } finally {
@@ -76,11 +76,8 @@ export default function MissionControl() {
 
   const fetchAgentStatus = async () => {
     try {
-      const response = await fetch("/api/v1/agent/status");
-      if (response.ok) {
-        const data = await response.json();
-        setAgentStatus(data);
-      }
+      const data = await agentGet<AgentStatus>(API.agent.status);
+      setAgentStatus(data);
     } catch (error) {
       console.error("Failed to fetch agent status:", error);
     }
@@ -88,39 +85,33 @@ export default function MissionControl() {
 
   const createMission = async () => {
     try {
-      const response = await fetch("/api/v1/agent/missions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: "current",
-          title: formData.title,
-          targetRole: formData.targetRole,
-          targetLocation: formData.targetLocation,
-          salaryMin: formData.salaryMin ? parseInt(formData.salaryMin) : null,
-          salaryMax: formData.salaryMax ? parseInt(formData.salaryMax) : null,
-          preferredSkills: formData.preferredSkills.split(",").map((s) => s.trim()),
-          experienceLevel: formData.experienceLevel,
-          employmentType: formData.employmentType,
-          dailyLimit: parseInt(formData.dailyLimit),
-          deadlineDays: parseInt(formData.deadlineDays),
-        }),
+      await agentPost(API.agent.missions, {
+        userId: user?.id || "",
+        title: formData.title,
+        targetRole: formData.targetRole,
+        targetLocation: formData.targetLocation,
+        salaryMin: formData.salaryMin ? parseInt(formData.salaryMin) : null,
+        salaryMax: formData.salaryMax ? parseInt(formData.salaryMax) : null,
+        preferredSkills: formData.preferredSkills.split(",").map((s) => s.trim()),
+        experienceLevel: formData.experienceLevel,
+        employmentType: formData.employmentType,
+        dailyLimit: parseInt(formData.dailyLimit),
+        deadlineDays: parseInt(formData.deadlineDays),
       });
-      if (response.ok) {
-        setShowCreateForm(false);
-        fetchMissions();
-        setFormData({
-          title: "",
-          targetRole: "",
-          targetLocation: "",
-          salaryMin: "",
-          salaryMax: "",
-          preferredSkills: "",
-          experienceLevel: "MID",
-          employmentType: "FULL_TIME",
-          dailyLimit: "20",
-          deadlineDays: "90",
-        });
-      }
+      setShowCreateForm(false);
+      fetchMissions();
+      setFormData({
+        title: "",
+        targetRole: "",
+        targetLocation: "",
+        salaryMin: "",
+        salaryMax: "",
+        preferredSkills: "",
+        experienceLevel: "MID",
+        employmentType: "FULL_TIME",
+        dailyLimit: "20",
+        deadlineDays: "90",
+      });
     } catch (error) {
       console.error("Failed to create mission:", error);
     }
@@ -128,7 +119,7 @@ export default function MissionControl() {
 
   const startMission = async (missionId: string) => {
     try {
-      await fetch(`/api/v1/agent/missions/${missionId}/start`, { method: "POST" });
+      await agentPost(API.agent.startMission(missionId));
       fetchMissions();
     } catch (error) {
       console.error("Failed to start mission:", error);
@@ -137,7 +128,7 @@ export default function MissionControl() {
 
   const pauseMission = async (missionId: string) => {
     try {
-      await fetch(`/api/v1/agent/missions/${missionId}/pause`, { method: "POST" });
+      await agentPost(API.agent.pauseMission(missionId));
       fetchMissions();
     } catch (error) {
       console.error("Failed to pause mission:", error);
@@ -146,7 +137,7 @@ export default function MissionControl() {
 
   const cancelMission = async (missionId: string) => {
     try {
-      await fetch(`/api/v1/agent/missions/${missionId}/cancel`, { method: "POST" });
+      await agentPost(API.agent.cancelMission(missionId));
       fetchMissions();
     } catch (error) {
       console.error("Failed to cancel mission:", error);

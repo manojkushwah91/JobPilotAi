@@ -3,6 +3,8 @@ package com.jobpilot.infrastructure.persistence.interview;
 import com.jobpilot.domain.interview.*;
 import com.jobpilot.infrastructure.persistence.shared.BaseJpaEntity;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.List;
@@ -27,11 +29,20 @@ public class InterviewSessionEntity extends BaseJpaEntity {
     @Column(name = "notes", columnDefinition = "text") private String notes;
     @Column(name = "feedback", columnDefinition = "text") private String feedback;
     @Column(name = "rating") private Integer rating;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "questions", columnDefinition = "jsonb") private String questions;
     @Column(name = "deleted") private boolean deleted;
     @Column(name = "deleted_at") private Instant deletedAt;
 
     protected InterviewSessionEntity() {}
+
+    public UUID getId() { return id; }
+    public UUID getUserId() { return userId; }
+    public UUID getCompanyId() { return companyId; }
+    public String getType() { return type; }
+    public String getStatus() { return status; }
+    public Integer getRating() { return rating; }
+    public Instant getScheduledAt() { return scheduledAt; }
 
     public static InterviewSessionEntity fromDomain(InterviewSession s) {
         var e = new InterviewSessionEntity();

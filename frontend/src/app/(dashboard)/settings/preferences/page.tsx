@@ -45,6 +45,18 @@ export default function PreferencesSettingsPage() {
   const [locationInput, setLocationInput] = useState('');
   const [initialized, setInitialized] = useState(false);
 
+  useEffect(() => {
+    if (!initialized && res?.data) {
+      setForm({
+        desiredRoles: res.data.desiredRoles ?? [],
+        preferredLocations: res.data.preferredLocations ?? [],
+        remotePreference: res.data.remotePreference ?? false,
+        employmentTypes: res.data.employmentTypes ?? [],
+      });
+      setInitialized(true);
+    }
+  }, [res?.data, initialized]);
+
   if (isLoading) {
     return (
       <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
@@ -83,17 +95,6 @@ export default function PreferencesSettingsPage() {
   }
 
   const prefs = res!.data;
-  useEffect(() => {
-    if (!initialized && prefs) {
-      setForm({
-        desiredRoles: prefs.desiredRoles ?? [],
-        preferredLocations: prefs.preferredLocations ?? [],
-        remotePreference: prefs.remotePreference ?? false,
-        employmentTypes: prefs.employmentTypes ?? [],
-      });
-      setInitialized(true);
-    }
-  }, [prefs, initialized]);
 
   const addRole = () => {
     const trimmed = roleInput.trim();

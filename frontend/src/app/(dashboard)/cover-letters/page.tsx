@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FileText, Plus, Loader2, Download, Trash2, Sparkles } from 'lucide-react';
 import { useApiQuery } from '@/lib/hooks/useQuery';
 import { API } from '@/lib/api/endpoints';
+import { apiPost, apiDelete } from '@/lib/api/client';
 import type { CoverLetter } from '@/types';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
@@ -33,12 +34,7 @@ export default function CoverLettersPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1'}${API.coverLetters.list}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content, tone }),
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Failed');
+      await apiPost(API.coverLetters.list, { title, content, tone });
       toast.success('Cover letter created');
       setOpen(false); setTitle(''); setContent('');
       refetch();
@@ -48,12 +44,7 @@ export default function CoverLettersPage() {
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1'}${API.coverLetters.generate}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId, resumeId, tone }),
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Failed');
+      await apiPost(API.coverLetters.generate, { jobId, resumeId, tone });
       toast.success('Cover letter generated!');
       setGenerateOpen(false);
       refetch();
@@ -62,10 +53,7 @@ export default function CoverLettersPage() {
 
   async function handleDelete(id: string) {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1'}${API.coverLetters.detail(id)}`, {
-        method: 'DELETE', credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Failed');
+      await apiDelete(API.coverLetters.detail(id));
       toast.success('Cover letter deleted');
       refetch();
     } catch { toast.error('Failed to delete'); }
