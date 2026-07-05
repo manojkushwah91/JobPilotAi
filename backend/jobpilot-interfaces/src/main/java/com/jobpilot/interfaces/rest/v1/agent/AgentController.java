@@ -4,6 +4,9 @@ import com.jobpilot.application.agent.service.AgentChatService;
 import com.jobpilot.application.agent.service.AgentTaskService;
 import com.jobpilot.application.agent.service.MissionService;
 import com.jobpilot.domain.agent.MissionStatus;
+import com.jobpilot.infrastructure.automation.BrowserAutomationService;
+import com.jobpilot.infrastructure.automation.progress.AutomationProgressTracker;
+import com.jobpilot.infrastructure.automation.queue.ApplicationQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -22,13 +25,22 @@ public class AgentController {
     private final MissionService missionService;
     private final AgentTaskService taskService;
     private final AgentChatService chatService;
+    private final BrowserAutomationService automationService;
+    private final AutomationProgressTracker progressTracker;
+    private final ApplicationQueue applicationQueue;
 
     public AgentController(MissionService missionService,
                            AgentTaskService taskService,
-                           AgentChatService chatService) {
+                           AgentChatService chatService,
+                           BrowserAutomationService automationService,
+                           AutomationProgressTracker progressTracker,
+                           ApplicationQueue applicationQueue) {
         this.missionService = missionService;
         this.taskService = taskService;
         this.chatService = chatService;
+        this.automationService = automationService;
+        this.progressTracker = progressTracker;
+        this.applicationQueue = applicationQueue;
     }
 
     @PostMapping("/missions")
@@ -130,10 +142,104 @@ public class AgentController {
         return ResponseEntity.ok(Map.of(
             "status", activeMissions > 0 ? "running" : "idle",
             "version", "2.0.0",
-            "activeMissions", activeMissions
+            "activeMissions", activeMissions,
+            "automationRunning", automationService.isRunning(),
+            "queueSize", automationService.getQueueSize(),
+            "availableBoards", automationService.getAvailableBoards()
         ));
+    }
+
+    @PostMapping("/automate/start")
+    public ResponseEntity<Map<String, Object>> startAutomation(@RequestBody StartAutomationRequest request) {
+        var userId = UUID.fromString(request.userId());
+        var missionId = request.missionId() != null ? UUID.fromString(request.missionId()) : null;
+
+        log.info("Starting automation: board={} user={}", request.boardName(), userId);
+
+        automationService.runAutomation(
+            request.boardName(),
+            request.credentials(),
+            userId,
+            missionId
+        );
+
+        return ResponseEntity.accepted().body(Map.of(
+            "status", "started",
+            "boardName", request.boardName(),
+            "queueSize", automationService.getQueueSize()
+        ));
+    }
+
+    @PostMapping("/automate/stop")
+    public ResponseEntity<Map<String, String>> stopAutomation() {
+        automationService.stop();
+        return ResponseEntity.ok(Map.of("status", "stopping"));
+    }
+
+    @GetMapping("/automate/status")
+    public ResponseEntity<Map<String, Object>> getAutomationStatus() {
+        return ResponseEntity.ok(Map.of(
+            "running", automationService.isRunning(),
+            "currentSessionId", automationService.getCurrentSessionId() != null ?
+                automationService.getCurrentSessionId() : "none",
+            "queueSize", automationService.getQueueSize(),
+            "availableBoards", automationService.getAvailableBoards()
+        ));
+    }
+
+    @GetMapping("/automate/boards")
+    public ResponseEntity<Map<String, Object>> getAvailableBoards() {
+        return ResponseEntity.ok(Map.of(
+            "boards", automationService.getAvailableBoards()
+        ));
+    }
+
+    @PostMapping("/automate/queue")
+    public ResponseEntity<Map<String, Object>> addToQueue(@RequestBody QueueJobRequest request) {
+        var added = applicationQueue.enqueue(new ApplicationQueue.JobApplicationRequest(
+            request.jobUrl(),
+            request.boardName(),
+            request.jobTitle(),
+            request.companyName(),
+            request.userProfile() != null ? request.userProfile() : Map.of()
+        ));
+
+        return ResponseEntity.ok(Map.of(
+            "added", added,
+            "queueSize", applicationQueue.size()
+        ));
+    }
+
+    @GetMapping("/automate/progress")
+    public ResponseEntity<?> getAllProgress() {
+        var allProgress = progressTracker.getAllProgress();
+        return ResponseEntity.ok(allProgress);
+    }
+
+    @GetMapping("/automate/progress/{sessionId}")
+    public ResponseEntity<?> getSessionProgress(@PathVariable String sessionId) {
+        var progress = progressTracker.getProgress(sessionId);
+        if (progress.isPresent()) {
+            return ResponseEntity.ok(progress.get());
+        }
+        return ResponseEntity.notFound().build();
     }
 
     public record ChatRequest(String userId, String message) {}
     public record ChatResponse(String response, String type) {}
+
+    public record StartAutomationRequest(
+        String boardName,
+        Map<String, String> credentials,
+        String userId,
+        String missionId
+   ) {}
+
+    public record QueueJobRequest(
+        String jobUrl,
+        String boardName,
+        String jobTitle,
+        String companyName,
+        Map<String, String> userProfile
+    ) {}
 }

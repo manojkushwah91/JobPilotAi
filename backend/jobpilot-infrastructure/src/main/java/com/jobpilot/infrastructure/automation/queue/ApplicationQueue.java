@@ -28,18 +28,15 @@ public class ApplicationQueue {
             return false;
         }
 
-        var existing = resultRepository.findByOutcome("SUBMITTED");
-        var alreadyApplied = existing.stream()
-            .anyMatch(r -> r.getJobUrl().equals(request.jobUrl()));
-
-        if (alreadyApplied) {
+        if (resultRepository.existsByJobUrlAndOutcomeIn(
+                request.jobUrl(), List.of("SUBMITTED", "PENDING_CAPTCHA"))) {
             log.debug("Already applied to: {}", request.jobUrl());
             processedUrls.add(request.jobUrl());
             return false;
         }
 
         queue.offer(request);
-        log.info("Queued application for: {}", request.jobUrl());
+        log.info("Queued application for: {} at {}", request.jobTitle(), request.companyName());
         return true;
     }
 

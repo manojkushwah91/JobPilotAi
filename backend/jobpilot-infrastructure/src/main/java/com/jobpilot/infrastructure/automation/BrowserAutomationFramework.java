@@ -126,6 +126,14 @@ public class BrowserAutomationFramework {
         return answers;
     }
 
+    public PlaywrightBrowserManager getBrowserManager() {
+        return browserManager;
+    }
+
+    public SessionManager getSessionManager() {
+        return sessionManager;
+    }
+
     public void cleanup() {
         log.info("Cleaning up browser automation framework");
         browserManager.closeBrowser();
