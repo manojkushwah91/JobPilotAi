@@ -233,6 +233,10 @@ public class BrowserAutomationService {
         return resultRepository.findByOutcome(outcome);
     }
 
+    public List<ApplicationResultJpaEntity> getRecentResults() {
+        return resultRepository.findTop50ByOrderByCreatedAtDesc();
+    }
+
     public List<String> getAvailableBoards() {
         return List.copyOf(adapters.keySet());
     }
@@ -248,5 +252,23 @@ public class BrowserAutomationService {
         stats.put("activeProxies", proxyManager.getActiveProxies().size());
         stats.put("stats", proxyManager.getStats());
         return stats;
+    }
+
+    private final Map<String, String> pendingCaptchaSolutions = new ConcurrentHashMap<>();
+
+    public boolean resolveCaptcha(String sessionId, String solution) {
+        if (sessionId == null || solution == null) return false;
+        pendingCaptchaSolutions.put(sessionId, solution);
+        progressTracker.trackCaptchaResolved(sessionId);
+        log.info("CAPTCHA solution received for session: {}", sessionId);
+        return true;
+    }
+
+    public String getCaptchaSolution(String sessionId) {
+        return pendingCaptchaSolutions.remove(sessionId);
+    }
+
+    public boolean hasCaptchaSolution(String sessionId) {
+        return pendingCaptchaSolutions.containsKey(sessionId);
     }
 }

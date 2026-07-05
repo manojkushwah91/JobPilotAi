@@ -102,6 +102,13 @@ export const API = {
     embeddings: '/ai/embeddings',
     health: '/ai/health',
   },
+  agent: {
+    chat: '/api/v1/agent/chat',
+    missions: '/api/v1/agent/missions',
+    emailEvents: '/api/v1/agent/email/events',
+    emailEventCounts: '/api/v1/agent/email/events/counts',
+    emailProcess: '/api/v1/agent/email/process',
+  },
   search: {
     query: '/search',
     suggestions: '/search/suggestions',

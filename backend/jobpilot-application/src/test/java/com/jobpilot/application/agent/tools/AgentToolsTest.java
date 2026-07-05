@@ -1,6 +1,7 @@
 package com.jobpilot.application.agent.tools;
 
 import com.jobpilot.application.agent.ports.AiProviderPort;
+import com.jobpilot.application.resume.ports.ResumeVersionRepository;
 import com.jobpilot.domain.agent.Tool;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,9 @@ class AgentToolsTest {
     @Mock
     private AiProviderPort aiProvider;
 
+    @Mock
+    private ResumeVersionRepository resumeVersionRepository;
+
     private JobDiscoveryTool jobDiscoveryTool;
     private ResumeTailoringTool resumeTailoringTool;
     private CoverLetterGeneratorTool coverLetterGeneratorTool;
@@ -27,7 +31,7 @@ class AgentToolsTest {
     @BeforeEach
     void setUp() {
         jobDiscoveryTool = new JobDiscoveryTool(aiProvider);
-        resumeTailoringTool = new ResumeTailoringTool(aiProvider);
+        resumeTailoringTool = new ResumeTailoringTool(aiProvider, resumeVersionRepository);
         coverLetterGeneratorTool = new CoverLetterGeneratorTool(aiProvider);
     }
 

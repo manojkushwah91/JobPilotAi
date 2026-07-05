@@ -203,6 +203,12 @@ public class AgentController {
         ));
     }
 
+    @GetMapping("/automate/results")
+    public ResponseEntity<?> getAutomationResults() {
+        var results = automationService.getRecentResults();
+        return ResponseEntity.ok(results);
+    }
+
     @GetMapping("/automate/boards")
     public ResponseEntity<Map<String, Object>> getAvailableBoards() {
         return ResponseEntity.ok(Map.of(
@@ -314,6 +320,15 @@ public class AgentController {
         return ResponseEntity.ok(result);
     }
 
+    @PostMapping("/automate/captcha/solve")
+    public ResponseEntity<Map<String, Object>> solveCaptcha(@RequestBody CaptchaSolveRequest request) {
+        var resolved = automationService.resolveCaptcha(request.sessionId(), request.solution());
+        return ResponseEntity.ok(Map.of(
+            "resolved", resolved,
+            "sessionId", request.sessionId()
+        ));
+    }
+
     public record ProcessEmailRequest(
         String messageId, String senderEmail, String subject,
         String body, String userId
@@ -326,6 +341,8 @@ public class AgentController {
     public record ScreenshotCompareRequest(
         String beforeBase64, String afterBase64
     ) {}
+
+    public record CaptchaSolveRequest(String sessionId, String solution) {}
 
     public record ChatRequest(String userId, String message) {}
     public record ChatResponse(String response, String type) {}

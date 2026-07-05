@@ -18,6 +18,7 @@ import {
   Clock,
   Loader2,
 } from 'lucide-react';
+import { CaptchaOverlay } from '@/components/features/automation/CaptchaOverlay';
 
 interface AutomationStatus {
   running: boolean;
@@ -61,6 +62,7 @@ export default function AutomationDashboard() {
   const [selectedBoard, setSelectedBoard] = useState('');
   const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [showLoginForm, setShowLoginForm] = useState(false);
+  const [captchaSession, setCaptchaSession] = useState<{ sessionId: string; jobTitle: string } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const eventLogRef = useRef<HTMLDivElement>(null);
 
@@ -108,6 +110,12 @@ export default function AutomationDashboard() {
           const data = JSON.parse(event.data);
           if (data.type === 'automation_progress' && data.data) {
             setProgressEvents((prev) => [data.data, ...prev].slice(0, 50));
+            if (data.data.waitingForCaptcha && data.data.sessionId) {
+              setCaptchaSession({
+                sessionId: data.data.sessionId,
+                jobTitle: data.data.jobTitle || 'Unknown Job',
+              });
+            }
             if (eventLogRef.current) {
               eventLogRef.current.scrollTop = 0;
             }
@@ -209,6 +217,13 @@ export default function AutomationDashboard() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      {captchaSession && (
+        <CaptchaOverlay
+          sessionId={captchaSession.sessionId}
+          jobTitle={captchaSession.jobTitle}
+          onSolved={() => setCaptchaSession(null)}
+        />
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Automation Dashboard</h1>

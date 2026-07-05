@@ -6,8 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class AgentChatService {
@@ -17,6 +17,7 @@ public class AgentChatService {
     private final MissionService missionService;
     private final AgentTaskService taskService;
     private final AiProviderPort aiProvider;
+    private final Map<UUID, List<ChatMessage>> conversationHistory = new ConcurrentHashMap<>();
 
     public AgentChatService(MissionService missionService,
                              AgentTaskService taskService,
@@ -29,37 +30,45 @@ public class AgentChatService {
     public ChatResponse processMessage(UUID userId, String message) {
         log.info("Processing chat message from user {}: {}", userId, message);
 
+        var history = conversationHistory.computeIfAbsent(userId, k -> new ArrayList<>());
+        history.add(new ChatMessage("user", message));
+
         var lowerMessage = message.toLowerCase().trim();
 
+        ChatResponse response;
+
         if (lowerMessage.contains("find") && lowerMessage.contains("job")) {
-            return handleFindJobs(userId, message);
+            response = handleFindJobs(userId, message);
+        } else if (lowerMessage.contains("pause")) {
+            response = handlePauseMission(userId);
+        } else if (lowerMessage.contains("resume") || lowerMessage.contains("continue")) {
+            response = handleResumeMission(userId);
+        } else if (lowerMessage.contains("stop") || lowerMessage.contains("cancel")) {
+            response = handleStopMission(userId);
+        } else if (lowerMessage.contains("status") || lowerMessage.contains("progress")) {
+            response = handleGetStatus(userId);
+        } else if (lowerMessage.contains("skip")) {
+            response = handleSkipCompany(userId, message);
+        } else if (lowerMessage.contains("salary")) {
+            response = handleSalaryUpdate(userId, message);
+        } else {
+            response = handleGeneralQuery(userId, message, history);
         }
 
-        if (lowerMessage.contains("pause")) {
-            return handlePauseMission(userId);
+        history.add(new ChatMessage("assistant", response.response()));
+        if (history.size() > 20) {
+            history.subList(0, history.size() - 20).clear();
         }
 
-        if (lowerMessage.contains("resume") || lowerMessage.contains("continue")) {
-            return handleResumeMission(userId);
-        }
+        return response;
+    }
 
-        if (lowerMessage.contains("stop") || lowerMessage.contains("cancel")) {
-            return handleStopMission(userId);
-        }
+    public List<ChatMessage> getConversationHistory(UUID userId) {
+        return List.copyOf(conversationHistory.getOrDefault(userId, List.of()));
+    }
 
-        if (lowerMessage.contains("status") || lowerMessage.contains("progress")) {
-            return handleGetStatus(userId);
-        }
-
-        if (lowerMessage.contains("skip")) {
-            return handleSkipCompany(userId, message);
-        }
-
-        if (lowerMessage.contains("salary")) {
-            return handleSalaryUpdate(userId, message);
-        }
-
-        return handleGeneralQuery(userId, message);
+    public void clearConversationHistory(UUID userId) {
+        conversationHistory.remove(userId);
     }
 
     private ChatResponse handleFindJobs(UUID userId, String message) {
@@ -178,14 +187,23 @@ public class AgentChatService {
         );
     }
 
-    private ChatResponse handleGeneralQuery(UUID userId, String message) {
+    private ChatResponse handleGeneralQuery(UUID userId, String message, List<ChatMessage> history) {
         var systemPrompt = "You are JobPilot AI, an autonomous job agent assistant. " +
             "Respond concisely to user queries about job hunting. " +
             "If the user asks about job search, applications, or missions, " +
             "guide them to use Mission Control or provide status updates. " +
-            "Keep responses under 2 sentences.";
+            "Keep responses under 3 sentences. " +
+            "You have access to the user's conversation history for context.";
 
-        var response = aiProvider.executePrompt(systemPrompt, message, null, 0.7, 200);
+        var contextBuilder = new StringBuilder();
+        var start = Math.max(0, history.size() - 6);
+        for (int i = start; i < history.size() - 1; i++) {
+            var msg = history.get(i);
+            contextBuilder.append(msg.role()).append(": ").append(msg.content()).append("\n");
+        }
+        contextBuilder.append("user: ").append(message);
+
+        var response = aiProvider.executePrompt(systemPrompt, contextBuilder.toString(), null, 0.7, 300);
 
         return new ChatResponse(response, "info");
     }
@@ -204,4 +222,5 @@ public class AgentChatService {
     }
 
     public record ChatResponse(String response, String type) {}
+    public record ChatMessage(String role, String content) {}
 }

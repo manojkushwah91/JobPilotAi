@@ -18,6 +18,7 @@ import {
   Rocket,
   MessageSquare,
   Bot,
+  Mail,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -31,6 +32,7 @@ const navItems = [
   { href: '/mission-control', label: 'Mission Control', icon: Rocket },
   { href: '/automation', label: 'Automation', icon: Bot },
   { href: '/agent-chat', label: 'Agent Chat', icon: MessageSquare },
+  { href: '/email-events', label: 'Email Events', icon: Mail },
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/resumes', label: 'Resumes', icon: FileText },
   { href: '/jobs', label: 'Jobs', icon: Briefcase },
