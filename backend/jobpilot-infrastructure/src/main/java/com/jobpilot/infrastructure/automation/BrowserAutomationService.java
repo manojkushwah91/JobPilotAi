@@ -5,6 +5,7 @@ import com.jobpilot.domain.automation.JobBoardAdapter;
 import com.jobpilot.infrastructure.automation.multitab.MultiTabManager;
 import com.jobpilot.infrastructure.automation.persistence.CookiePersistenceManager;
 import com.jobpilot.infrastructure.automation.progress.AutomationProgressTracker;
+import com.jobpilot.infrastructure.automation.proxy.ProxyManager;
 import com.jobpilot.infrastructure.automation.queue.ApplicationQueue;
 import com.jobpilot.infrastructure.automation.queue.ApplicationQueue.JobApplicationRequest;
 import com.jobpilot.infrastructure.automation.retry.SmartRetryManager;
@@ -14,6 +15,7 @@ import com.jobpilot.infrastructure.persistence.automation.ApplicationResultJpaEn
 import com.jobpilot.domain.automation.ApplicationOutcome;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -34,10 +36,14 @@ public class BrowserAutomationService {
     private final SmartRetryManager smartRetryManager;
     private final CookiePersistenceManager cookiePersistenceManager;
     private final ApplicationResultJpaRepository resultRepository;
+    private final ProxyManager proxyManager;
     private final Map<String, JobBoardAdapter> adapters = new ConcurrentHashMap<>();
 
     private volatile boolean running = false;
     private volatile String currentSessionId = null;
+
+    @Value("${jobpilot.browser.headless:true}")
+    private boolean defaultHeadless;
 
     public BrowserAutomationService(BrowserAutomationFramework framework,
                                      ApplicationQueue applicationQueue,
@@ -47,6 +53,7 @@ public class BrowserAutomationService {
                                      SmartRetryManager smartRetryManager,
                                      CookiePersistenceManager cookiePersistenceManager,
                                      ApplicationResultJpaRepository resultRepository,
+                                     ProxyManager proxyManager,
                                      List<JobBoardAdapter> adapterList) {
         this.framework = framework;
         this.applicationQueue = applicationQueue;
@@ -56,6 +63,7 @@ public class BrowserAutomationService {
         this.smartRetryManager = smartRetryManager;
         this.cookiePersistenceManager = cookiePersistenceManager;
         this.resultRepository = resultRepository;
+        this.proxyManager = proxyManager;
 
         for (var adapter : adapterList) {
             adapters.put(adapter.name().toLowerCase(), adapter);
@@ -65,7 +73,13 @@ public class BrowserAutomationService {
     @Async
     public void runAutomation(String boardName, Map<String, String> credentials,
                                UUID userId, UUID missionId) {
-        log.info("Starting automation for board={} user={} mission={}", boardName, userId, missionId);
+        runAutomation(boardName, credentials, userId, missionId, defaultHeadless);
+    }
+
+    @Async
+    public void runAutomation(String boardName, Map<String, String> credentials,
+                               UUID userId, UUID missionId, boolean headless) {
+        log.info("Starting automation for board={} user={} headless={}", boardName, userId, headless);
         running = true;
         var browserManager = framework.getBrowserManager();
 
@@ -76,8 +90,11 @@ public class BrowserAutomationService {
                     ". Available: " + adapters.keySet());
             }
 
+            proxyManager.initialize();
+            var proxy = proxyManager.getNextProxy();
+
             multiTabManager.initialize();
-            framework.initialize("chromium");
+            framework.initialize("chromium", headless, proxy);
 
             var sessionId = UUID.randomUUID().toString();
             currentSessionId = sessionId;
@@ -93,11 +110,17 @@ public class BrowserAutomationService {
 
             progressTracker.trackStart(sessionId, adapter.loginFlow().loginUrl(), "Login");
 
-            var loginResult = smartRetryManager.executeWithStrategy(
-                "LOGIN",
-                () -> framework.executeApplication(session, adapter, credentials, adapter.loginFlow().loginUrl()),
-                "Login to " + boardName
-            );
+            try {
+                smartRetryManager.executeWithStrategy(
+                    "LOGIN",
+                    () -> framework.executeApplication(session, adapter, credentials, adapter.loginFlow().loginUrl()),
+                    "Login to " + boardName
+                );
+                proxyManager.reportSuccess(proxy);
+            } catch (Exception e) {
+                proxyManager.reportFailure(proxy);
+                throw e;
+            }
 
             cookiePersistenceManager.saveCookies(browserManager, boardName);
 
@@ -212,5 +235,18 @@ public class BrowserAutomationService {
 
     public List<String> getAvailableBoards() {
         return List.copyOf(adapters.keySet());
+    }
+
+    public boolean isHeadlessMode() {
+        return defaultHeadless;
+    }
+
+    public Map<String, Object> getProxyStats() {
+        var stats = new HashMap<String, Object>();
+        stats.put("enabled", proxyManager.isEnabled());
+        stats.put("poolSize", proxyManager.getPoolSize());
+        stats.put("activeProxies", proxyManager.getActiveProxies().size());
+        stats.put("stats", proxyManager.getStats());
+        return stats;
     }
 }

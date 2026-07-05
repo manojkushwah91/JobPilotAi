@@ -156,16 +156,20 @@ public class AgentController {
 
         log.info("Starting automation: board={} user={}", request.boardName(), userId);
 
+        var headless = request.headless() != null ? request.headless() : true;
+
         automationService.runAutomation(
             request.boardName(),
             request.credentials(),
             userId,
-            missionId
+            missionId,
+            headless
         );
 
         return ResponseEntity.accepted().body(Map.of(
             "status", "started",
             "boardName", request.boardName(),
+            "headless", headless,
             "queueSize", automationService.getQueueSize()
         ));
     }
@@ -225,6 +229,11 @@ public class AgentController {
         return ResponseEntity.notFound().build();
     }
 
+    @GetMapping("/automate/proxy")
+    public ResponseEntity<Map<String, Object>> getProxyStats() {
+        return ResponseEntity.ok(automationService.getProxyStats());
+    }
+
     public record ChatRequest(String userId, String message) {}
     public record ChatResponse(String response, String type) {}
 
@@ -232,8 +241,9 @@ public class AgentController {
         String boardName,
         Map<String, String> credentials,
         String userId,
-        String missionId
-   ) {}
+        String missionId,
+        Boolean headless
+    ) {}
 
     public record QueueJobRequest(
         String jobUrl,

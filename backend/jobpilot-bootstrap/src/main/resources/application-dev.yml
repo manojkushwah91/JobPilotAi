@@ -120,3 +120,22 @@ management:
   tracing:
     sampling:
       probability: 1.0
+
+jobpilot:
+  browser:
+    headless: true
+    proxy: ${JOBPILOT_PROXY:}
+    slow-ms: 0
+  proxy:
+    enabled: false
+    list: ${JOBPILOT_PROXY_LIST:}
+    rotation-interval-ms: 300000
+    max-failures: 3
+  stealth:
+    enabled: true
+    min-delay-ms: 1000
+    max-delay-ms: 5000
+  multitab:
+    max-tabs: 3
+  cookies:
+    dir: ./cookies

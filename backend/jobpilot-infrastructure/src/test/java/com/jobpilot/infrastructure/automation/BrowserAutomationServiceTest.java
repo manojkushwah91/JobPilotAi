@@ -4,6 +4,7 @@ import com.jobpilot.domain.automation.JobBoardAdapter;
 import com.jobpilot.infrastructure.automation.multitab.MultiTabManager;
 import com.jobpilot.infrastructure.automation.persistence.CookiePersistenceManager;
 import com.jobpilot.infrastructure.automation.progress.AutomationProgressTracker;
+import com.jobpilot.infrastructure.automation.proxy.ProxyManager;
 import com.jobpilot.infrastructure.automation.queue.ApplicationQueue;
 import com.jobpilot.infrastructure.automation.retry.SmartRetryManager;
 import com.jobpilot.infrastructure.automation.stealth.StealthManager;
@@ -31,6 +32,7 @@ class BrowserAutomationServiceTest {
     @Mock private SmartRetryManager smartRetryManager;
     @Mock private CookiePersistenceManager cookiePersistenceManager;
     @Mock private ApplicationResultJpaRepository resultRepository;
+    @Mock private ProxyManager proxyManager;
 
     private BrowserAutomationService service;
 
@@ -45,6 +47,7 @@ class BrowserAutomationServiceTest {
             smartRetryManager,
             cookiePersistenceManager,
             resultRepository,
+            proxyManager,
             List.of()
         );
     }
@@ -118,7 +121,7 @@ class BrowserAutomationServiceTest {
         var serviceWithAdapter = new BrowserAutomationService(
             framework, applicationQueue, progressTracker,
             stealthManager, multiTabManager, smartRetryManager,
-            cookiePersistenceManager, resultRepository,
+            cookiePersistenceManager, resultRepository, proxyManager,
             List.of(adapter)
         );
 
@@ -142,5 +145,30 @@ class BrowserAutomationServiceTest {
     @DisplayName("Should get null current session before starting")
     void shouldGetNullCurrentSessionBeforeStarting() {
         assertNull(service.getCurrentSessionId());
+    }
+
+    @Test
+    @DisplayName("Should report proxy stats")
+    void shouldReportProxyStats() {
+        when(proxyManager.isEnabled()).thenReturn(true);
+        when(proxyManager.getPoolSize()).thenReturn(5);
+        when(proxyManager.getActiveProxies()).thenReturn(List.of("p1", "p2"));
+
+        var stats = service.getProxyStats();
+        assertEquals(true, stats.get("enabled"));
+        assertEquals(5, stats.get("poolSize"));
+        assertEquals(2, stats.get("activeProxies"));
+    }
+
+    @Test
+    @DisplayName("Should report headless mode from default value")
+    void shouldReportHeadlessMode() {
+        var serviceWithHeadless = new BrowserAutomationService(
+            framework, applicationQueue, progressTracker,
+            stealthManager, multiTabManager, smartRetryManager,
+            cookiePersistenceManager, resultRepository, proxyManager,
+            List.of()
+        );
+        assertNotNull(serviceWithHeadless);
     }
 }

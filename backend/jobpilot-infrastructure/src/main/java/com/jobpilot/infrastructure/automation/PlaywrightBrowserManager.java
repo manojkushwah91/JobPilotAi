@@ -1,9 +1,15 @@
 package com.jobpilot.infrastructure.automation;
 
-import com.microsoft.playwright.*;
+import com.microsoft.playwright.Browser;
+import com.microsoft.playwright.BrowserContext;
+import com.microsoft.playwright.BrowserType;
+import com.microsoft.playwright.Page;
+import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.options.Proxy;
 import com.jobpilot.application.automation.ports.BrowserPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -20,13 +26,35 @@ public class PlaywrightBrowserManager implements BrowserPort {
     private Page page;
     private final AtomicBoolean isOpen = new AtomicBoolean(false);
 
+    @Value("${jobpilot.browser.headless:true}")
+    private boolean defaultHeadless;
+
+    @Value("${jobpilot.browser.proxy:}")
+    private String defaultProxy;
+
+    @Value("${jobpilot.browser.slow-ms:0}")
+    private int slowMs;
+
     @Override
     public void launch(String browserType, Map<String, Object> options) {
         log.info("Launching {} browser", browserType);
         playwright = Playwright.create();
 
+        var headless = (Boolean) options.getOrDefault("headless", defaultHeadless);
+        var proxy = (String) options.getOrDefault("proxy", defaultProxy);
+        var slowMo = (Integer) options.getOrDefault("slowMs", slowMs);
+
         var launchOptions = new BrowserType.LaunchOptions()
-            .setHeadless((Boolean) options.getOrDefault("headless", true));
+            .setHeadless(headless);
+
+        if (slowMo > 0) {
+            launchOptions.setSlowMo(slowMo);
+        }
+
+        if (proxy != null && !proxy.isEmpty()) {
+            launchOptions.setProxy(new Proxy(proxy));
+            log.info("Using proxy: {}", proxy);
+        }
 
         browser = switch (browserType.toLowerCase()) {
             case "firefox" -> playwright.firefox().launch(launchOptions);
@@ -38,10 +66,22 @@ public class PlaywrightBrowserManager implements BrowserPort {
             .setViewportSize(1920, 1080)
             .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
+        if (proxy != null && !proxy.isEmpty()) {
+            contextOptions.setProxy(new Proxy(proxy));
+        }
+
         context = browser.newContext(contextOptions);
         page = context.newPage();
         isOpen.set(true);
-        log.info("Browser launched successfully");
+        log.info("Browser launched successfully (headless={}, proxy={})", headless, proxy != null && !proxy.isEmpty());
+    }
+
+    public void launchWithProxy(String browserType, String proxy, boolean headless) {
+        launch(browserType, Map.of(
+            "headless", headless,
+            "proxy", proxy != null ? proxy : "",
+            "slowMs", slowMs
+        ));
     }
 
     @Override

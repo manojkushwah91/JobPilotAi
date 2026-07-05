@@ -66,6 +66,15 @@ public class BrowserAutomationFramework {
         browserManager.launch(browserType, Map.of("headless", true));
     }
 
+    public void initialize(String browserType, boolean headless, String proxy) {
+        log.info("Initializing browser automation framework with {} (headless={}, proxy={})",
+            browserType, headless, proxy != null && !proxy.isEmpty());
+        browserManager.launch(browserType, Map.of(
+            "headless", headless,
+            "proxy", proxy != null ? proxy : ""
+        ));
+    }
+
     public BrowserSession startSession(String boardName, Map<String, String> credentials) {
         return sessionManager.createSession(boardName, credentials);
     }
