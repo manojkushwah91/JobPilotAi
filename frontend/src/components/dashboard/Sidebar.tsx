@@ -17,6 +17,7 @@ import {
   X,
   Rocket,
   MessageSquare,
+  Bot,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -28,6 +29,7 @@ interface SidebarProps {
 
 const navItems = [
   { href: '/mission-control', label: 'Mission Control', icon: Rocket },
+  { href: '/automation', label: 'Automation', icon: Bot },
   { href: '/agent-chat', label: 'Agent Chat', icon: MessageSquare },
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/resumes', label: 'Resumes', icon: FileText },
