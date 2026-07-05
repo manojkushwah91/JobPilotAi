@@ -234,6 +234,26 @@ public class AgentController {
         return ResponseEntity.ok(automationService.getProxyStats());
     }
 
+    @GetMapping("/analytics/overview")
+    public ResponseEntity<Map<String, Object>> getAnalyticsOverview() {
+        var totalSubmitted = automationService.getResultsByOutcome("SUBMITTED").size();
+        var totalFailed = automationService.getResultsByOutcome("FAILED").size();
+        var totalPending = automationService.getResultsByOutcome("PENDING_CAPTCHA").size();
+        var total = totalSubmitted + totalFailed + totalPending;
+        var successRate = total > 0 ? (double) totalSubmitted / total * 100 : 0.0;
+
+        return ResponseEntity.ok(Map.of(
+            "totalApplications", total,
+            "submitted", totalSubmitted,
+            "failed", totalFailed,
+            "pendingCaptcha", totalPending,
+            "successRate", Math.round(successRate * 100.0) / 100.0,
+            "availableBoards", automationService.getAvailableBoards(),
+            "automationRunning", automationService.isRunning(),
+            "queueSize", automationService.getQueueSize()
+        ));
+    }
+
     public record ChatRequest(String userId, String message) {}
     public record ChatResponse(String response, String type) {}
 

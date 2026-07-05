@@ -26,34 +26,36 @@ public class CoverLetterGeneratorTool implements Tool {
 
     @Override
     public String description() {
-        return "Generates a personalized cover letter for a specific job application";
+        return "Generates a tailored cover letter for a specific job posting";
     }
 
     @Override
     public Map<String, Object> execute(Map<String, Object> input) {
         log.info("Executing cover letter generator tool");
 
-        var candidateProfile = (String) input.getOrDefault("candidateProfile", "");
+        var resumeContent = (String) input.getOrDefault("resumeContent", "");
         var jobDescription = (String) input.getOrDefault("jobDescription", "");
         var companyName = (String) input.getOrDefault("companyName", "");
-        var tone = (String) input.getOrDefault("tone", "professional");
+        var jobTitle = (String) input.getOrDefault("jobTitle", "");
+        var userName = (String) input.getOrDefault("userName", "Applicant");
 
-        var systemPrompt = "You are an expert cover letter writer. Generate a personalized, " +
-            "compelling cover letter that matches the candidate's profile with the job requirements. " +
-            "Never use generic templates. Return a JSON object with: coverLetter, wordCount, keyPoints.";
+        var systemPrompt = "You are an expert cover letter writer. Given a resume and job description, " +
+            "write a compelling, professional cover letter that highlights relevant experience and skills. " +
+            "The cover letter should be concise (3-4 paragraphs), personalized for the company, " +
+            "and demonstrate genuine interest. Return the cover letter as plain text.";
 
         var userPrompt = String.format(
-            "Candidate Profile:\n%s\n\nJob Description:\n%s\n\nCompany: %s\nTone: %s",
-            candidateProfile, jobDescription, companyName, tone
+            "Applicant Name: %s\nResume:\n%s\n\nJob Description:\n%s\n\nCompany: %s\nJob Title: %s",
+            userName, resumeContent, jobDescription, companyName, jobTitle
         );
 
-        var result = aiProvider.executePrompt(systemPrompt, userPrompt, null, 0.4, 2000);
+        var result = aiProvider.executePrompt(systemPrompt, userPrompt, null, 0.7, 1000);
 
         return Map.of(
             "status", "success",
             "coverLetter", result,
             "companyName", companyName,
-            "tone", tone
+            "jobTitle", jobTitle
         );
     }
 
