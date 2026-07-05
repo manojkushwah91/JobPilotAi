@@ -17,5 +17,6 @@ public interface JobRepository {
                                      String experienceLevel, String industry, String location,
                                      Integer salaryMin, Integer salaryMax, String postedWithin,
                                      Pageable pageable);
+    Optional<JobListing> findByApplicationUrl(String applicationUrl);
     void delete(JobListing job);
 }

@@ -122,6 +122,12 @@ management:
       probability: 1.0
 
 jobpilot:
+  scraper:
+    enabled: true
+    search-query: software developer
+    search-location: remote
+    schedule-ms: 300000
+    max-results: 50
   browser:
     headless: true
     proxy: ${JOBPILOT_PROXY:}

@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Optional;
 import java.util.UUID;
 
 public interface JobListingJpaRepository extends JpaRepository<JobListingEntity, UUID>,
@@ -22,4 +23,6 @@ public interface JobListingJpaRepository extends JpaRepository<JobListingEntity,
     Page<JobListingEntity> search(@Param("query") String query, Pageable pageable);
 
     Page<JobListingEntity> findBySkillsIn(String[] skills, Pageable pageable);
+
+    Optional<JobListingEntity> findByApplicationUrl(String applicationUrl);
 }

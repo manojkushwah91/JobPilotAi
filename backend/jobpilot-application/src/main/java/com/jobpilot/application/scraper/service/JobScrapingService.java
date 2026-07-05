@@ -25,18 +25,30 @@ public class JobScrapingService {
         this.jobRepository = jobRepository;
     }
 
-    @Transactional
     public int scrapeAll(String query, String location) {
         int total = 0;
+        int skipped = 0;
+        int failed = 0;
         for (var scraper : scrapers) {
             if (!scraper.isEnabled()) continue;
             try {
                 var results = scraper.scrape(query, location, 50);
                 for (var dto : results) {
-                    ingestJob(scraper.sourceName(), dto);
-                    total++;
+                    try {
+                        if (ingestJob(scraper.sourceName(), dto)) {
+                            total++;
+                        } else {
+                            skipped++;
+                        }
+                    } catch (Exception e) {
+                        failed++;
+                        log.warn("Failed to ingest job '{}': {}", dto.title(), e.getMessage());
+                    }
                 }
-                log.info("Scraped {} jobs from {}", results.size(), scraper.sourceName());
+                log.info("Scraped {} jobs from {} ({} ingested, {} duplicates, {} failed)",
+                    results.size(), scraper.sourceName(), total, skipped, failed);
+                skipped = 0;
+                failed = 0;
             } catch (Exception e) {
                 log.error("Failed to scrape from {}: {}", scraper.sourceName(), e.getMessage());
             }
@@ -44,7 +56,15 @@ public class JobScrapingService {
         return total;
     }
 
-    private void ingestJob(String source, ScrapedJobDTO dto) {
+    @Transactional
+    boolean ingestJob(String source, ScrapedJobDTO dto) {
+        var appUrl = dto.applicationUrl();
+        if (appUrl != null && !appUrl.isBlank()) {
+            if (jobRepository.findByApplicationUrl(appUrl).isPresent()) {
+                return false;
+            }
+        }
+
         var jobId = JobId.generate();
         var job = JobListing.create(jobId, source, dto.title(), dto.companyName(), dto.description());
 
@@ -62,6 +82,7 @@ public class JobScrapingService {
             employmentType, experienceLevel,
             dto.industry(), dto.skills(), dto.applicationUrl());
         jobRepository.save(job);
+        return true;
     }
 
     private <T extends Enum<T>> T tryParseEnum(Class<T> enumClass, String value) {

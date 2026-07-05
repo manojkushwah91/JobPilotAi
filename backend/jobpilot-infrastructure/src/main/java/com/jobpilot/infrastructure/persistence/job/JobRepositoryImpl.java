@@ -48,6 +48,12 @@ public class JobRepositoryImpl implements JobRepository {
     }
 
     @Override
+    public Optional<JobListing> findByApplicationUrl(String applicationUrl) {
+        if (applicationUrl == null || applicationUrl.isBlank()) return Optional.empty();
+        return jpaRepository.findByApplicationUrl(applicationUrl).map(JobListingEntity::toDomain);
+    }
+
+    @Override
     public void delete(JobListing job) {
         jpaRepository.deleteById(job.jobId().value());
     }
