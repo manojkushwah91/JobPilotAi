@@ -5,8 +5,11 @@ import com.jobpilot.application.agent.service.AgentTaskService;
 import com.jobpilot.application.agent.service.MissionService;
 import com.jobpilot.domain.agent.MissionStatus;
 import com.jobpilot.infrastructure.automation.BrowserAutomationService;
+import com.jobpilot.infrastructure.automation.email.EmailMonitorService;
 import com.jobpilot.infrastructure.automation.progress.AutomationProgressTracker;
 import com.jobpilot.infrastructure.automation.queue.ApplicationQueue;
+import com.jobpilot.infrastructure.automation.ratelimit.BoardRateLimiter;
+import com.jobpilot.infrastructure.automation.screenshot.ScreenshotDiffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -28,19 +31,28 @@ public class AgentController {
     private final BrowserAutomationService automationService;
     private final AutomationProgressTracker progressTracker;
     private final ApplicationQueue applicationQueue;
+    private final EmailMonitorService emailMonitorService;
+    private final BoardRateLimiter rateLimiter;
+    private final ScreenshotDiffer screenshotDiffer;
 
     public AgentController(MissionService missionService,
                            AgentTaskService taskService,
                            AgentChatService chatService,
                            BrowserAutomationService automationService,
                            AutomationProgressTracker progressTracker,
-                           ApplicationQueue applicationQueue) {
+                           ApplicationQueue applicationQueue,
+                           EmailMonitorService emailMonitorService,
+                           BoardRateLimiter rateLimiter,
+                           ScreenshotDiffer screenshotDiffer) {
         this.missionService = missionService;
         this.taskService = taskService;
         this.chatService = chatService;
         this.automationService = automationService;
         this.progressTracker = progressTracker;
         this.applicationQueue = applicationQueue;
+        this.emailMonitorService = emailMonitorService;
+        this.rateLimiter = rateLimiter;
+        this.screenshotDiffer = screenshotDiffer;
     }
 
     @PostMapping("/missions")
@@ -253,6 +265,67 @@ public class AgentController {
             "queueSize", automationService.getQueueSize()
         ));
     }
+
+    @GetMapping("/email/events")
+    public ResponseEntity<?> getEmailEvents() {
+        return ResponseEntity.ok(emailMonitorService.getRecentEvents());
+    }
+
+    @GetMapping("/email/events/counts")
+    public ResponseEntity<?> getEmailEventCounts() {
+        return ResponseEntity.ok(emailMonitorService.getEventCounts());
+    }
+
+    @PostMapping("/email/process")
+    public ResponseEntity<?> processEmail(@RequestBody ProcessEmailRequest request) {
+        var event = emailMonitorService.processIncomingEmail(
+            request.messageId(),
+            request.senderEmail(),
+            request.subject(),
+            request.body(),
+            UUID.fromString(request.userId())
+        );
+        return ResponseEntity.ok(Map.of(
+            "processed", event != null,
+            "eventType", event != null ? event.eventType().name() : "IGNORED"
+        ));
+    }
+
+    @GetMapping("/ratelimit/stats")
+    public ResponseEntity<?> getRateLimitStats() {
+        var stats = new java.util.HashMap<String, Object>();
+        for (var board : automationService.getAvailableBoards()) {
+            stats.put(board, rateLimiter.getStats(board).toMap());
+        }
+        return ResponseEntity.ok(stats);
+    }
+
+    @PostMapping("/ratelimit/limits")
+    public ResponseEntity<?> setRateLimits(@RequestBody RateLimitRequest request) {
+        rateLimiter.setLimits(request.boardName(), request.delayMs(), request.dailyCap(), request.hourlyCap());
+        return ResponseEntity.ok(Map.of("status", "updated", "board", request.boardName()));
+    }
+
+    @PostMapping("/screenshot/compare")
+    public ResponseEntity<?> compareScreenshots(@RequestBody ScreenshotCompareRequest request) {
+        var before = screenshotDiffer.fromBase64(request.beforeBase64());
+        var after = screenshotDiffer.fromBase64(request.afterBase64());
+        var result = screenshotDiffer.compareScreenshots(before, after);
+        return ResponseEntity.ok(result);
+    }
+
+    public record ProcessEmailRequest(
+        String messageId, String senderEmail, String subject,
+        String body, String userId
+    ) {}
+
+    public record RateLimitRequest(
+        String boardName, int delayMs, int dailyCap, int hourlyCap
+    ) {}
+
+    public record ScreenshotCompareRequest(
+        String beforeBase64, String afterBase64
+    ) {}
 
     public record ChatRequest(String userId, String message) {}
     public record ChatResponse(String response, String type) {}

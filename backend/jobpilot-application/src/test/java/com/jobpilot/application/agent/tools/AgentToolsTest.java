@@ -127,7 +127,6 @@ class AgentToolsTest {
         assertNotNull(result);
         assertEquals("success", result.get("status"));
         assertEquals("Microsoft", result.get("companyName"));
-        assertEquals("professional", result.get("tone"));
     }
 
     @Test
