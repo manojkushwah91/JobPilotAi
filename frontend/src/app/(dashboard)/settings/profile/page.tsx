@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useApiQuery, useApiMutation } from '@/lib/hooks/useQuery';
 import { API } from '@/lib/api/endpoints';
-import { agentGet, agentPost } from '@/lib/api/agent-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
