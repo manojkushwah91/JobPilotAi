@@ -16,7 +16,7 @@ import java.time.Duration;
 public class CacheConfig {
 
     @Bean
-    @Profile("!dev")
+    @Profile("!dev & !test")
     public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
         RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
             .entryTtl(Duration.ofMinutes(10))

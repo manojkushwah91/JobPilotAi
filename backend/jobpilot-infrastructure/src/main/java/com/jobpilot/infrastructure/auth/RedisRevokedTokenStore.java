@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository;
 import java.util.concurrent.TimeUnit;
 
 @Repository
-@Profile("!dev")
+@Profile("!dev & !test")
 @Primary
 public class RedisRevokedTokenStore implements RevokedTokenStore {
 

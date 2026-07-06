@@ -24,7 +24,7 @@ public class AgentMemoryJpaEntity {
     @Column(name = "memory_key", nullable = false)
     private String key;
 
-    @Column(columnDefinition = "text")
+    @Column(name = "memory_value", columnDefinition = "text")
     private String value;
 
     @JdbcTypeCode(SqlTypes.JSON)

@@ -6,7 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
@@ -111,6 +110,7 @@ public class DefaultAgentRuntime implements AgentRuntime {
         observationRepository.save(observation);
     }
 
+    @SuppressWarnings("unchecked")
     private AgentDecision reason(Mission mission, List<AgentObservation> observations) {
         log.debug("Reasoning for mission {}", mission.missionId());
 
@@ -123,20 +123,84 @@ public class DefaultAgentRuntime implements AgentRuntime {
             );
         }
 
+        var missionTasks = taskService.getMissionTasks(mission.missionId().value());
+
+        var hasRunningApplyTasks = missionTasks.stream()
+            .anyMatch(t -> t.taskType() == TaskType.SUBMIT_APPLICATION
+                && (t.status() == TaskStatus.RUNNING || t.status() == TaskStatus.PENDING));
+
+        if (hasRunningApplyTasks) {
+            log.debug("Mission {} has running apply tasks, skipping discovery", mission.missionId());
+            return null;
+        }
+
+        var unprocessedDiscoveries = missionTasks.stream()
+            .filter(t -> t.taskType() == TaskType.DISCOVER_JOBS
+                && t.status() == TaskStatus.COMPLETED
+                && t.output() != null
+                && !t.output().containsKey("processed"))
+            .toList();
+
+        if (!unprocessedDiscoveries.isEmpty()) {
+            for (var discoveryTask : unprocessedDiscoveries) {
+                var jobsFound = discoveryTask.output().get("jobsFound");
+                if (jobsFound instanceof List<?> jobs && !jobs.isEmpty()) {
+                    log.info("Processing {} discovered jobs from task {}", jobs.size(), discoveryTask.taskId());
+
+                    int remaining = (int) mission.dailyApplicationLimit() -
+                        mission.totalApplicationsSubmitted();
+
+                    for (int i = 0; i < Math.min(jobs.size(), remaining); i++) {
+                        var job = (Map<String, Object>) jobs.get(i);
+                        var jobUrl = (String) job.getOrDefault("url", "");
+                        var jobTitle = (String) job.getOrDefault("title", "Unknown");
+                        var company = (String) job.getOrDefault("company", "Unknown");
+
+                        if (jobUrl.isBlank()) continue;
+
+                        var input = new LinkedHashMap<String, Object>();
+                        input.put("url", jobUrl);
+                        input.put("title", jobTitle);
+                        input.put("company", company);
+                        input.put("jobId", job.get("id"));
+                        input.put("description", job.get("description"));
+
+                        taskService.createTaskWithPriority(
+                            mission.missionId().value(),
+                            mission.userId(),
+                            TaskType.SUBMIT_APPLICATION,
+                            "Apply to: " + jobTitle + " at " + company,
+                            5
+                        );
+                        log.info("Created SUBMIT_APPLICATION task for {} at {}", jobTitle, company);
+                    }
+
+                    discoveryTask.output().put("processed", true);
+                }
+            }
+
+            return AgentDecision.create(
+                mission.missionId().value(),
+                DecisionType.APPLY_TO_JOB,
+                "Created apply tasks from discovered jobs"
+            );
+        }
+
         if (!mission.hasReachedDailyLimit()) {
-            var discoveryTask = AgentTask.create(
-                mission.missionId().value(),
-                mission.userId(),
-                TaskType.DISCOVER_JOBS,
-                "Discover new jobs matching mission criteria"
-            );
-            taskService.createTaskWithPriority(
-                mission.missionId().value(),
-                mission.userId(),
-                TaskType.DISCOVER_JOBS,
-                "Discover new jobs",
-                10
-            );
+            var hasRecentDiscovery = missionTasks.stream()
+                .anyMatch(t -> t.taskType() == TaskType.DISCOVER_JOBS
+                    && t.status() == TaskStatus.COMPLETED);
+
+            if (!hasRecentDiscovery) {
+                taskService.createTaskWithPriority(
+                    mission.missionId().value(),
+                    mission.userId(),
+                    TaskType.DISCOVER_JOBS,
+                    "Discover new jobs matching mission criteria",
+                    10
+                );
+                log.info("Created DISCOVER_JOBS task for mission {}", mission.missionId());
+            }
         }
 
         return null;
@@ -160,8 +224,18 @@ public class DefaultAgentRuntime implements AgentRuntime {
                 taskService.startTask(task.taskId().value());
                 var tool = toolRegistry.findByName(task.taskType().name());
                 if (tool.isPresent()) {
-                    var result = tool.get().execute(task.input() != null ? task.input() : Map.of());
+                    Map<String, Object> taskInput = task.input() != null ? task.input() : Map.of();
+                    var enrichedInput = new LinkedHashMap<String, Object>(taskInput);
+
+                    if (task.taskType() == TaskType.DISCOVER_JOBS) {
+                        enrichedInput.putIfAbsent("query", mission.targetRole());
+                        enrichedInput.putIfAbsent("location", mission.targetLocation());
+                        enrichedInput.putIfAbsent("skills", String.join(", ", mission.preferredSkills()));
+                    }
+
+                    var result = tool.get().execute(enrichedInput);
                     taskService.completeTask(task.taskId().value(), result);
+                    log.info("Task {} completed with result: {}", task.taskId(), result);
                 } else {
                     taskService.failTask(task.taskId().value(), "Tool not found: " + task.taskType().name());
                 }

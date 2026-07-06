@@ -1,14 +1,20 @@
 package com.jobpilot.application.agent.tools;
 
 import com.jobpilot.application.agent.ports.AiProviderPort;
+import com.jobpilot.application.job.ports.JobRepository;
 import com.jobpilot.application.resume.ports.ResumeVersionRepository;
 import com.jobpilot.domain.agent.Tool;
+import com.jobpilot.domain.job.JobId;
+import com.jobpilot.domain.job.JobListing;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -24,13 +30,16 @@ class AgentToolsTest {
     @Mock
     private ResumeVersionRepository resumeVersionRepository;
 
+    @Mock
+    private JobRepository jobRepository;
+
     private JobDiscoveryTool jobDiscoveryTool;
     private ResumeTailoringTool resumeTailoringTool;
     private CoverLetterGeneratorTool coverLetterGeneratorTool;
 
     @BeforeEach
     void setUp() {
-        jobDiscoveryTool = new JobDiscoveryTool(aiProvider);
+        jobDiscoveryTool = new JobDiscoveryTool(jobRepository);
         resumeTailoringTool = new ResumeTailoringTool(aiProvider, resumeVersionRepository);
         coverLetterGeneratorTool = new CoverLetterGeneratorTool(aiProvider);
     }
@@ -52,9 +61,10 @@ class AgentToolsTest {
     }
 
     @Test
-    void jobDiscoveryTool_shouldExecuteWithAI() {
-        when(aiProvider.executePrompt(anyString(), anyString(), any(), anyDouble(), anyInt()))
-            .thenReturn("[{\"title\":\"Java Developer\",\"company\":\"Google\"}]");
+    void jobDiscoveryTool_shouldExecuteWithDB() {
+        var job = JobListing.create(JobId.generate(), "playwright-scraper", "Java Developer", "Google", "desc");
+        when(jobRepository.search(anyString(), any(PageRequest.class)))
+            .thenReturn(new PageImpl<>(List.of(job)));
 
         var result = jobDiscoveryTool.execute(Map.of(
             "query", "Java Developer",
@@ -64,8 +74,21 @@ class AgentToolsTest {
 
         assertNotNull(result);
         assertEquals("success", result.get("status"));
-        assertEquals("Java Developer", result.get("query"));
-        verify(aiProvider).executePrompt(anyString(), anyString(), any(), anyDouble(), anyInt());
+        verify(jobRepository).search(anyString(), any(PageRequest.class));
+    }
+
+    @Test
+    void jobDiscoveryTool_shouldReturnEmptyWhenNoJobs() {
+        when(jobRepository.search(anyString(), any(PageRequest.class)))
+            .thenReturn(new PageImpl<>(List.of()));
+
+        var result = jobDiscoveryTool.execute(Map.of(
+            "query", "Nonexistent",
+            "location", "Mars"
+        ));
+
+        assertNotNull(result);
+        assertEquals("success", result.get("status"));
     }
 
     @Test
@@ -135,7 +158,7 @@ class AgentToolsTest {
 
     @Test
     void jobDiscoveryTool_shouldHaveTimeout() {
-        assertEquals(60, jobDiscoveryTool.timeoutSeconds());
+        assertEquals(30, jobDiscoveryTool.timeoutSeconds());
     }
 
     @Test
