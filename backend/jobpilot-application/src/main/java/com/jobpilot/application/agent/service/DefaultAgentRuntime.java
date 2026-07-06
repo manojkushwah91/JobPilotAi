@@ -233,6 +233,10 @@ public class DefaultAgentRuntime implements AgentRuntime {
                         enrichedInput.putIfAbsent("skills", String.join(", ", mission.preferredSkills()));
                     }
 
+                    if (task.taskType() == TaskType.SUBMIT_APPLICATION) {
+                        enrichedInput.putIfAbsent("userId", mission.userId());
+                    }
+
                     var result = tool.get().execute(enrichedInput);
                     taskService.completeTask(task.taskId().value(), result);
                     log.info("Task {} completed with result: {}", task.taskId(), result);
@@ -256,6 +260,56 @@ public class DefaultAgentRuntime implements AgentRuntime {
 
     private void learn(Mission mission) {
         log.debug("Learning from mission {}", mission.missionId());
+        var tasks = taskService.getMissionTasks(mission.missionId().value());
+
+        var completedApplyTasks = tasks.stream()
+            .filter(t -> t.taskType() == TaskType.SUBMIT_APPLICATION && t.status() == TaskStatus.COMPLETED)
+            .toList();
+
+        var failedApplyTasks = tasks.stream()
+            .filter(t -> t.taskType() == TaskType.SUBMIT_APPLICATION && t.status() == TaskStatus.FAILED)
+            .toList();
+
+        if (!completedApplyTasks.isEmpty() || !failedApplyTasks.isEmpty()) {
+            var total = completedApplyTasks.size() + failedApplyTasks.size();
+            var successRate = total > 0 ? (double) completedApplyTasks.size() / total : 0.0;
+
+            memoryService.store(
+                mission.userId(),
+                MemoryType.SUCCESS_RATE,
+                "mission:" + mission.missionId().value(),
+                String.format("{\"successRate\":%.2f,\"applied\":%d,\"failed\":%d}",
+                    successRate, completedApplyTasks.size(), failedApplyTasks.size())
+            );
+        }
+
+        for (var task : completedApplyTasks) {
+            if (task.output() != null && task.output().containsKey("company")) {
+                var company = (String) task.output().get("company");
+                if (company != null && !company.isBlank()) {
+                    memoryService.store(
+                        mission.userId(),
+                        MemoryType.APPLIED_COMPANY,
+                        company.toLowerCase(),
+                        "Applied via mission " + mission.missionId().value()
+                    );
+                }
+            }
+        }
+
+        for (var task : failedApplyTasks) {
+            if (task.output() != null && task.output().containsKey("company")) {
+                var company = (String) task.output().get("company");
+                if (company != null && !company.isBlank()) {
+                    memoryService.store(
+                        mission.userId(),
+                        MemoryType.REJECTED_COMPANY,
+                        company.toLowerCase(),
+                        "Failed to apply: " + (task.errorMessage() != null ? task.errorMessage() : "unknown")
+                    );
+                }
+            }
+        }
     }
 
     @Override

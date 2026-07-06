@@ -3,14 +3,11 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
-import { User, Briefcase, Shield, Cpu, CreditCard } from 'lucide-react';
+import { User, Briefcase } from 'lucide-react';
 
 const settingsTabs = [
   { id: 'profile', label: 'Profile', icon: User, href: '/settings/profile' },
   { id: 'preferences', label: 'Job Preferences', icon: Briefcase, href: '/settings/preferences' },
-  { id: 'privacy', label: 'Privacy', icon: Shield, href: '/settings/privacy' },
-  { id: 'ai', label: 'AI', icon: Cpu, href: '/settings/ai' },
-  { id: 'billing', label: 'Billing', icon: CreditCard, href: '/settings/billing' },
 ];
 
 export function SettingsSidebar() {

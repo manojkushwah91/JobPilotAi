@@ -9,16 +9,11 @@ import {
   FileText,
   Briefcase,
   ClipboardList,
-  Mic,
-  Building2,
-  BarChart3,
   Settings,
-  Shield,
-  X,
-  Rocket,
-  MessageSquare,
   Bot,
-  Mail,
+  MessageSquare,
+  Bell,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -29,27 +24,18 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { href: '/mission-control', label: 'Mission Control', icon: Rocket },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/automation', label: 'Automation', icon: Bot },
   { href: '/agent-chat', label: 'Agent Chat', icon: MessageSquare },
-  { href: '/email-events', label: 'Email Events', icon: Mail },
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/resumes', label: 'Resumes', icon: FileText },
   { href: '/jobs', label: 'Jobs', icon: Briefcase },
   { href: '/applications', label: 'Applications', icon: ClipboardList },
-  { href: '/interviews', label: 'Interviews', icon: Mic },
-  { href: '/companies', label: 'Companies', icon: Building2 },
-  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/notifications', label: 'Notifications', icon: Bell },
+  { href: '/resumes', label: 'Resumes', icon: FileText },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
-const adminItem = { href: '/admin', label: 'Admin', icon: Shield };
-
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { user } = useAuth();
-
-  const items = user?.role === 'ADMIN' ? [...navItems, adminItem] : navItems;
 
   return (
     <>
@@ -75,7 +61,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         </div>
         <ScrollArea className="flex-1 py-2">
           <nav className="space-y-1 px-2">
-            {items.map((item) => {
+            {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
               return (

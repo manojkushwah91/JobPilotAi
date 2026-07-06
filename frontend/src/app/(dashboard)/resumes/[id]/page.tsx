@@ -6,7 +6,6 @@ import { useApiQuery, useApiMutation } from '@/lib/hooks/useQuery';
 import { API } from '@/lib/api/endpoints';
 import type { Resume, ResumeSection, SectionType, AtsScore } from '@/types';
 import { SectionEditor } from '@/components/features/resumes/SectionEditor';
-import { AtsScorePanel } from '@/components/features/resumes/AtsScorePanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -193,13 +192,6 @@ export default function ResumeDetailPage() {
             onMoveDown={handleMoveDown}
             onContentChange={handleContentChange}
             onTitleChange={handleTitleChange}
-          />
-        </div>
-        <div className="w-80 shrink-0">
-          <AtsScorePanel
-            score={atsScore}
-            isScoring={scoreMutation.isPending}
-            onScore={handleScore}
           />
         </div>
       </div>
