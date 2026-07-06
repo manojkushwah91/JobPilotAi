@@ -136,4 +136,13 @@ export const API = {
     apiKeys: '/settings/api-keys',
     apiKeyDetail: (id: string) => `/settings/api-keys/${id}`,
   },
+  candidateProfile: {
+    get: '/api/v1/profile',
+    update: '/api/v1/profile',
+    skills: '/api/v1/profile/skills',
+    experience: '/api/v1/profile/experience',
+    education: '/api/v1/profile/education',
+    resume: '/api/v1/profile/resume',
+    preferences: '/api/v1/profile/preferences',
+  },
 } as const;

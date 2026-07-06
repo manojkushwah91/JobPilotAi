@@ -7,9 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Component
 public class ApplicationSubmissionTool implements Tool {
@@ -32,7 +30,7 @@ public class ApplicationSubmissionTool implements Tool {
 
     @Override
     public String description() {
-        return "Submits a job application using browser automation with candidate profile data";
+        return "Navigates to a job URL, analyzes the form, fills it with candidate profile data, and submits";
     }
 
     @Override
@@ -41,12 +39,18 @@ public class ApplicationSubmissionTool implements Tool {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public Map<String, Object> execute(Map<String, Object> input) {
         log.info("Executing application submission tool");
 
         var url = (String) input.getOrDefault("url", "");
-        var resumePath = (String) input.getOrDefault("resumePath", "");
+        var jobTitle = (String) input.getOrDefault("title", "");
+        var company = (String) input.getOrDefault("company", "");
         var userId = input.get("userId") instanceof UUID uid ? uid : null;
+
+        if (url.isBlank()) {
+            return Map.of("status", "error", "error", "No URL provided");
+        }
 
         var profileData = new LinkedHashMap<String, Object>();
         if (userId != null) {
@@ -59,6 +63,7 @@ public class ApplicationSubmissionTool implements Tool {
                 profileData.put("resumeText", profile.resumeText());
                 profileData.put("resumeFileUrl", profile.resumeFileUrl());
                 profileData.put("linkedinUrl", profile.linkedinUrl());
+                profileData.put("portfolioUrl", profile.portfolioUrl());
             });
         }
 
@@ -66,10 +71,40 @@ public class ApplicationSubmissionTool implements Tool {
             browserAutomation.launchBrowser();
             browserAutomation.navigateTo(url);
 
-            var formFields = browserAutomation.getApplicationFormFields(url);
+            Thread.sleep(2000);
 
-            if (profileData.containsKey("email")) {
-                autoFillForm(formFields, profileData);
+            var formAnalysis = browserAutomation.getApplicationFormFields(url);
+            var pageType = (String) formAnalysis.getOrDefault("pageType", "UNKNOWN");
+            var hasCaptcha = (Boolean) formAnalysis.getOrDefault("hasCaptcha", false);
+            var fields = (List<Map<String, Object>>) formAnalysis.getOrDefault("fields", List.of());
+
+            log.info("Page type: {}, Fields found: {}, Has CAPTCHA: {}", pageType, fields.size(), hasCaptcha);
+
+            int filledCount = 0;
+            var filledFields = new ArrayList<String>();
+            var skippedFields = new ArrayList<String>();
+
+            for (var field : fields) {
+                var selector = (String) field.get("selector");
+                var fieldType = (String) field.get("type");
+                var label = (String) field.getOrDefault("label", "");
+                var name = (String) field.getOrDefault("name", "");
+                var required = (Boolean) field.getOrDefault("required", false);
+
+                var matchResult = matchFieldToProfile(label, name, fieldType, profileData);
+                if (matchResult != null) {
+                    try {
+                        browserAutomation.fillField(selector, matchResult);
+                        filledCount++;
+                        filledFields.add(label.isEmpty() ? name : label);
+                        log.info("Filled field '{}' with profile data", label.isEmpty() ? name : label);
+                    } catch (Exception e) {
+                        log.warn("Failed to fill field {}: {}", selector, e.getMessage());
+                        skippedFields.add(label.isEmpty() ? name : label);
+                    }
+                } else if (required) {
+                    skippedFields.add(label.isEmpty() ? name : label);
+                }
             }
 
             var screenshot = browserAutomation.takeScreenshot();
@@ -77,16 +112,26 @@ public class ApplicationSubmissionTool implements Tool {
             var result = new LinkedHashMap<String, Object>();
             result.put("status", "awaiting_approval");
             result.put("url", url);
-            result.put("screenshot", screenshot != null ? "captured" : "failed");
+            result.put("jobTitle", jobTitle);
+            result.put("company", company);
+            result.put("pageType", pageType);
+            result.put("totalFields", fields.size());
+            result.put("filledFields", filledCount);
+            result.put("filledFieldNames", filledFields);
+            result.put("unfilledRequiredFields", skippedFields);
+            result.put("hasCaptcha", hasCaptcha);
             result.put("profileLoaded", !profileData.isEmpty());
-            result.put("formFieldsFound", formFields != null ? formFields.size() : 0);
-            result.put("message", "Application prepared with profile data. Awaiting user approval.");
+            result.put("screenshot", screenshot != null && screenshot.length > 0 ? "captured" : "failed");
+            result.put("message", String.format("Found %d fields, filled %d with profile data. Awaiting approval.",
+                fields.size(), filledCount));
             return result;
+
         } catch (Exception e) {
             log.error("Application submission failed: {}", e.getMessage());
             return Map.of(
                 "status", "error",
-                "error", e.getMessage()
+                "error", e.getMessage(),
+                "url", url
             );
         } finally {
             try {
@@ -97,36 +142,59 @@ public class ApplicationSubmissionTool implements Tool {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private void autoFillForm(Map<String, Object> formFields, Map<String, Object> profile) {
-        if (formFields == null) return;
+    private String matchFieldToProfile(String label, String name, String type, Map<String, Object> profile) {
+        var fieldText = (label + " " + name).toLowerCase();
 
-        for (var entry : formFields.entrySet()) {
-            var fieldName = entry.getKey().toLowerCase();
-            var selector = (String) entry.getValue();
+        if (profile.isEmpty()) return null;
 
-            try {
-                if (fieldName.contains("name") && !fieldName.contains("company") && profile.containsKey("fullName")) {
-                    browserAutomation.fillField(selector, (String) profile.get("fullName"));
-                } else if (fieldName.contains("email") && profile.containsKey("email")) {
-                    browserAutomation.fillField(selector, (String) profile.get("email"));
-                } else if (fieldName.contains("phone") && profile.containsKey("phone")) {
-                    browserAutomation.fillField(selector, (String) profile.get("phone"));
-                } else if (fieldName.contains("location") || fieldName.contains("city")) {
-                    if (profile.containsKey("location")) {
-                        browserAutomation.fillField(selector, (String) profile.get("location"));
-                    }
-                } else if (fieldName.contains("linkedin") && profile.containsKey("linkedinUrl")) {
-                    browserAutomation.fillField(selector, (String) profile.get("linkedinUrl"));
-                }
-            } catch (Exception e) {
-                log.warn("Failed to fill field {}: {}", fieldName, e.getMessage());
+        if (fieldText.contains("first") && fieldText.contains("name")) {
+            var fullName = (String) profile.get("fullName");
+            if (fullName != null) {
+                var parts = fullName.split(" ", 2);
+                return parts[0];
             }
         }
+        if (fieldText.contains("last") && fieldText.contains("name")) {
+            var fullName = (String) profile.get("fullName");
+            if (fullName != null) {
+                var parts = fullName.split(" ", 2);
+                return parts.length > 1 ? parts[1] : "";
+            }
+        }
+        if (fieldText.contains("full") && fieldText.contains("name") || fieldText.equals("name")) {
+            return (String) profile.get("fullName");
+        }
+        if (fieldText.contains("email")) {
+            return (String) profile.get("email");
+        }
+        if (fieldText.contains("phone") || fieldText.contains("tel")) {
+            return (String) profile.get("phone");
+        }
+        if (fieldText.contains("location") || fieldText.contains("city") || fieldText.contains("address")) {
+            return (String) profile.get("location");
+        }
+        if (fieldText.contains("linkedin")) {
+            return (String) profile.get("linkedinUrl");
+        }
+        if (fieldText.contains("portfolio") || fieldText.contains("website") || fieldText.contains("github")) {
+            return (String) profile.get("portfolioUrl");
+        }
+        if (fieldText.contains("summary") || fieldText.contains("about") || fieldText.contains("bio")) {
+            return (String) profile.get("summary");
+        }
+
+        if ("file".equals(type) && fieldText.contains("resume")) {
+            var fileUrl = (String) profile.get("resumeFileUrl");
+            if (fileUrl != null && !fileUrl.isBlank()) {
+                return fileUrl;
+            }
+        }
+
+        return null;
     }
 
     @Override
     public int timeoutSeconds() {
-        return 120;
+        return 180;
     }
 }

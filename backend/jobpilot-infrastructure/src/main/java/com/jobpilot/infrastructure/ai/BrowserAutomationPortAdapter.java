@@ -3,10 +3,12 @@ package com.jobpilot.infrastructure.ai;
 import com.jobpilot.application.agent.ports.BrowserAutomationPort;
 import com.jobpilot.infrastructure.automation.BrowserAutomationFramework;
 import com.jobpilot.infrastructure.automation.PlaywrightBrowserManager;
+import com.jobpilot.infrastructure.automation.PlaywrightDomAnalyzer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Component
@@ -16,11 +18,14 @@ public class BrowserAutomationPortAdapter implements BrowserAutomationPort {
 
     private final BrowserAutomationFramework framework;
     private final PlaywrightBrowserManager browserManager;
+    private final PlaywrightDomAnalyzer domAnalyzer;
 
     public BrowserAutomationPortAdapter(BrowserAutomationFramework framework,
-                                         PlaywrightBrowserManager browserManager) {
+                                         PlaywrightBrowserManager browserManager,
+                                         PlaywrightDomAnalyzer domAnalyzer) {
         this.framework = framework;
         this.browserManager = browserManager;
+        this.domAnalyzer = domAnalyzer;
     }
 
     @Override
@@ -35,6 +40,7 @@ public class BrowserAutomationPortAdapter implements BrowserAutomationPort {
         var page = browserManager.getPage();
         if (page != null) {
             page.navigate(url);
+            page.waitForTimeout(2000);
         }
     }
 
@@ -98,7 +104,44 @@ public class BrowserAutomationPortAdapter implements BrowserAutomationPort {
 
     @Override
     public Map<String, Object> getApplicationFormFields(String url) {
-        return Map.of("fields", Map.of());
+        var result = new LinkedHashMap<String, Object>();
+        try {
+            var page = browserManager.getPage();
+            if (page == null) return result;
+
+            var pageType = domAnalyzer.detectPageType();
+            result.put("pageType", pageType);
+
+            var forms = page.querySelectorAll("form");
+            result.put("formCount", forms.size());
+
+            var allFields = domAnalyzer.analyzeAllForms();
+            var fieldsList = new java.util.ArrayList<Map<String, Object>>();
+            for (var field : allFields) {
+                var fieldMap = new LinkedHashMap<String, Object>();
+                fieldMap.put("selector", field.selector());
+                fieldMap.put("type", field.type());
+                fieldMap.put("label", field.label());
+                fieldMap.put("name", field.name());
+                fieldMap.put("required", field.required());
+                fieldMap.put("value", field.currentValue());
+                if (field.options() != null) fieldMap.put("options", field.options());
+                fieldsList.add(fieldMap);
+            }
+            result.put("fields", fieldsList);
+
+            var captchas = domAnalyzer.detectCAPTCHAs();
+            result.put("hasCaptcha", !captchas.isEmpty());
+            result.put("captchaCount", captchas.size());
+
+            var jobDetails = domAnalyzer.extractJobDetails();
+            result.put("jobDetails", jobDetails);
+
+        } catch (Exception e) {
+            log.error("Failed to analyze form fields: {}", e.getMessage());
+            result.put("error", e.getMessage());
+        }
+        return result;
     }
 
     @Override

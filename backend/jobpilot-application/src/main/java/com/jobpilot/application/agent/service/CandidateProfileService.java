@@ -30,38 +30,40 @@ public class CandidateProfileService {
         return repository.save(profile);
     }
 
+    private CandidateProfile getOrCreateForUpdate(UUID userId, String fullName, String email) {
+        return repository.findByUserId(userId)
+            .orElseGet(() -> repository.save(CandidateProfile.create(userId,
+                fullName != null ? fullName : "Unknown",
+                email != null ? email : "")));
+    }
+
     public CandidateProfile updateBasicInfo(UUID userId, String fullName, String phone,
                                               String location, String headline, String summary) {
-        var profile = repository.findByUserId(userId)
-            .orElseThrow(() -> new RuntimeException("Profile not found for user: " + userId));
+        var profile = getOrCreateForUpdate(userId, fullName, null);
         profile.updateProfile(fullName, phone, location, headline, summary);
         return repository.save(profile);
     }
 
     public CandidateProfile updateSkills(UUID userId, java.util.List<String> skills) {
-        var profile = repository.findByUserId(userId)
-            .orElseThrow(() -> new RuntimeException("Profile not found for user: " + userId));
+        var profile = getOrCreateForUpdate(userId, null, null);
         profile.updateSkills(skills);
         return repository.save(profile);
     }
 
     public CandidateProfile updateExperience(UUID userId, java.util.List<String> experience) {
-        var profile = repository.findByUserId(userId)
-            .orElseThrow(() -> new RuntimeException("Profile not found for user: " + userId));
+        var profile = getOrCreateForUpdate(userId, null, null);
         profile.updateExperience(experience);
         return repository.save(profile);
     }
 
     public CandidateProfile updateEducation(UUID userId, java.util.List<String> education) {
-        var profile = repository.findByUserId(userId)
-            .orElseThrow(() -> new RuntimeException("Profile not found for user: " + userId));
+        var profile = getOrCreateForUpdate(userId, null, null);
         profile.updateEducation(education);
         return repository.save(profile);
     }
 
     public CandidateProfile updateResume(UUID userId, String resumeText, String resumeFileUrl) {
-        var profile = repository.findByUserId(userId)
-            .orElseThrow(() -> new RuntimeException("Profile not found for user: " + userId));
+        var profile = getOrCreateForUpdate(userId, null, null);
         profile.updateResume(resumeText, resumeFileUrl);
         return repository.save(profile);
     }
@@ -69,8 +71,7 @@ public class CandidateProfileService {
     public CandidateProfile updatePreferences(UUID userId, String desiredRole, String desiredLocation,
                                                 Integer salaryMin, Integer salaryMax, String currency,
                                                 String employmentType, String workPreference) {
-        var profile = repository.findByUserId(userId)
-            .orElseThrow(() -> new RuntimeException("Profile not found for user: " + userId));
+        var profile = getOrCreateForUpdate(userId, null, null);
         profile.updatePreferences(desiredRole, desiredLocation, salaryMin, salaryMax, currency, employmentType, workPreference);
         return repository.save(profile);
     }

@@ -8,7 +8,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
-@Profile("dev")
+@Profile({"dev", "test"})
 public class InMemoryRevokedTokenStore implements RevokedTokenStore {
 
     private final Set<String> revokedTokens = ConcurrentHashMap.newKeySet();
