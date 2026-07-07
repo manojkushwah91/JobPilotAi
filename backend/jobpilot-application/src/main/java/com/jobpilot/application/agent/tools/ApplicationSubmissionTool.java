@@ -2,9 +2,11 @@ package com.jobpilot.application.agent.tools;
 
 import com.jobpilot.application.agent.ports.BrowserAutomationPort;
 import com.jobpilot.application.agent.ports.CandidateProfileRepository;
+import com.jobpilot.application.automation.ports.PortalDetectorPort;
 import com.jobpilot.domain.agent.Tool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -16,6 +18,8 @@ public class ApplicationSubmissionTool implements Tool {
 
     private final BrowserAutomationPort browserAutomation;
     private final CandidateProfileRepository profileRepository;
+    @Autowired(required = false)
+    private PortalDetectorPort portalDetector;
 
     public ApplicationSubmissionTool(BrowserAutomationPort browserAutomation,
                                       CandidateProfileRepository profileRepository) {
@@ -86,12 +90,31 @@ public class ApplicationSubmissionTool implements Tool {
 
             Thread.sleep(2000);
 
-            var formAnalysis = browserAutomation.getApplicationFormFields(url);
+            String currentUrl = url;
+            String portalType = "unknown";
+            if (portalDetector != null) {
+                portalType = portalDetector.detectPortal(currentUrl);
+            }
+
+            if ("unknown".equals(portalType)) {
+                var applyUrl = findAndClickApplyButton();
+                if (applyUrl != null) {
+                    currentUrl = applyUrl;
+                    Thread.sleep(3000);
+                    if (portalDetector != null) {
+                        portalType = portalDetector.detectPortal(currentUrl);
+                    }
+                    log.info("Redirected to: {} (portal: {})", currentUrl, portalType);
+                }
+            }
+
+            var formAnalysis = browserAutomation.getApplicationFormFields(currentUrl);
             var pageType = (String) formAnalysis.getOrDefault("pageType", "UNKNOWN");
             var hasCaptcha = (Boolean) formAnalysis.getOrDefault("hasCaptcha", false);
             var fields = (List<Map<String, Object>>) formAnalysis.getOrDefault("fields", List.of());
 
-            log.info("Page type: {}, Fields found: {}, Has CAPTCHA: {}", pageType, fields.size(), hasCaptcha);
+            log.info("Page type: {}, Portal: {}, Fields found: {}, Has CAPTCHA: {}",
+                pageType, portalType, fields.size(), hasCaptcha);
 
             int filledCount = 0;
             var filledFields = new ArrayList<String>();
@@ -135,6 +158,7 @@ public class ApplicationSubmissionTool implements Tool {
             result.put("hasCaptcha", hasCaptcha);
             result.put("profileLoaded", !profileData.isEmpty());
             result.put("screenshot", screenshot != null && screenshot.length > 0 ? "captured" : "failed");
+            result.put("portalType", portalType);
             result.put("message", String.format("Found %d fields, filled %d with profile data. Awaiting approval.",
                 fields.size(), filledCount));
             return result;
@@ -153,6 +177,31 @@ public class ApplicationSubmissionTool implements Tool {
                 log.warn("Failed to close browser: {}", e.getMessage());
             }
         }
+    }
+
+    private String findAndClickApplyButton() {
+        var applySelectors = List.of(
+            "a[href*='apply']",
+            "button:has-text('Apply')",
+            "a:has-text('Apply')",
+            "[data-apply-url]",
+            ".apply-button",
+            "#apply-button",
+            "a[title*='Apply']",
+            "button[title*='Apply']"
+        );
+
+        for (var selector : applySelectors) {
+            try {
+                browserAutomation.clickElement(selector);
+                Thread.sleep(2000);
+                log.info("Clicked apply button with selector: {}", selector);
+                return null;
+            } catch (Exception e) {
+                // continue to next selector
+            }
+        }
+        return null;
     }
 
     private void fillFieldByType(String selector, String type, String value) {
