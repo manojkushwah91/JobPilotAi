@@ -1,5 +1,6 @@
 package com.jobpilot.interfaces.rest.v1.agent;
 
+import com.jobpilot.domain.agent.AgentRuntime;
 import com.jobpilot.application.agent.service.AgentChatService;
 import com.jobpilot.application.agent.service.AgentTaskService;
 import com.jobpilot.application.agent.service.MissionService;
@@ -28,6 +29,7 @@ public class AgentController {
     private final MissionService missionService;
     private final AgentTaskService taskService;
     private final AgentChatService chatService;
+    private final AgentRuntime agentRuntime;
     private final BrowserAutomationService automationService;
     private final AutomationProgressTracker progressTracker;
     private final ApplicationQueue applicationQueue;
@@ -38,6 +40,7 @@ public class AgentController {
     public AgentController(MissionService missionService,
                            AgentTaskService taskService,
                            AgentChatService chatService,
+                           AgentRuntime agentRuntime,
                            BrowserAutomationService automationService,
                            AutomationProgressTracker progressTracker,
                            ApplicationQueue applicationQueue,
@@ -47,6 +50,7 @@ public class AgentController {
         this.missionService = missionService;
         this.taskService = taskService;
         this.chatService = chatService;
+        this.agentRuntime = agentRuntime;
         this.automationService = automationService;
         this.progressTracker = progressTracker;
         this.applicationQueue = applicationQueue;
@@ -89,7 +93,8 @@ public class AgentController {
 
     @PostMapping("/missions/{missionId}/start")
     public ResponseEntity<MissionResponse> startMission(@PathVariable UUID missionId) {
-        var mission = missionService.startMission(missionId);
+        agentRuntime.startMission(missionId);
+        var mission = missionService.getMission(missionId);
         return ResponseEntity.ok(MissionResponse.from(mission));
     }
 

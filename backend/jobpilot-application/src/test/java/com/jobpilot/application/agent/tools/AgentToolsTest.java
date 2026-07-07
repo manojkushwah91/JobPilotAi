@@ -81,6 +81,8 @@ class AgentToolsTest {
     void jobDiscoveryTool_shouldReturnEmptyWhenNoJobs() {
         when(jobRepository.search(anyString(), any(PageRequest.class)))
             .thenReturn(new PageImpl<>(List.of()));
+        when(jobRepository.findAllActive(any(PageRequest.class)))
+            .thenReturn(new PageImpl<>(List.of()));
 
         var result = jobDiscoveryTool.execute(Map.of(
             "query", "Nonexistent",

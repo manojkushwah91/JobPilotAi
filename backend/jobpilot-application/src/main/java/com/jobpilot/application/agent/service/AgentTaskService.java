@@ -40,6 +40,14 @@ public class AgentTaskService {
         return task;
     }
 
+    public AgentTask createTaskWithInput(UUID missionId, UUID userId, TaskType taskType,
+                                          String description, int priority, Map<String, Object> input) {
+        var task = AgentTask.createWithPriorityAndInput(missionId, userId, taskType, description, priority, input);
+        taskRepository.save(task);
+        log.info("Created task {} with priority {} and input for mission {}", task.taskId(), priority, missionId);
+        return task;
+    }
+
     public AgentTask getTask(UUID taskId) {
         var taskIdObj = com.jobpilot.domain.agent.AgentTaskId.from(taskId);
         return taskRepository.findById(taskIdObj)

@@ -75,6 +75,8 @@ public class AgentTaskJpaEntity {
         entity.status = task.status();
         entity.priority = task.priority();
         entity.description = task.description();
+        entity.input = task.input() != null ? com.jobpilot.infrastructure.config.JsonConfig.toJson(task.input()) : null;
+        entity.output = task.output() != null ? com.jobpilot.infrastructure.config.JsonConfig.toJson(task.output()) : null;
         entity.errorMessage = task.errorMessage();
         entity.retryCount = task.retryCount();
         entity.maxRetries = task.maxRetries();
@@ -93,7 +95,9 @@ public class AgentTaskJpaEntity {
             com.jobpilot.domain.agent.TaskType.valueOf(taskType.name()),
             com.jobpilot.domain.agent.TaskStatus.valueOf(status.name()),
             priority, description,
-            null, null, errorMessage,
+            input != null ? com.jobpilot.infrastructure.config.JsonConfig.fromJsonMap(input) : null,
+            output != null ? com.jobpilot.infrastructure.config.JsonConfig.fromJsonMap(output) : null,
+            errorMessage,
             retryCount, maxRetries,
             startedAt, completedAt, scheduledAt,
             createdAt, updatedAt

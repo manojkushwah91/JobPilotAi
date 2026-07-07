@@ -49,7 +49,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private Bucket createBucket(String key) {
-        var limit = key.startsWith("admin") ? 60 : 100;
+        var limit = 1000;
         var refill = Refill.intervally(limit, Duration.ofMinutes(1));
         var bandwidth = Bandwidth.classic(limit, refill);
         return Bucket.builder().addLimit(bandwidth).build();

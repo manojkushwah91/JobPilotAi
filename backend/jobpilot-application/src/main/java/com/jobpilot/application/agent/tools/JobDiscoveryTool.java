@@ -44,6 +44,10 @@ public class JobDiscoveryTool implements Tool {
             var searchQuery = buildSearchQuery(query, skills);
             var jobs = jobRepository.search(searchQuery, PageRequest.of(0, limit));
 
+            if (jobs.isEmpty()) {
+                jobs = jobRepository.findAllActive(PageRequest.of(0, limit));
+            }
+
             var jobList = new ArrayList<Map<String, Object>>();
             for (var job : jobs.getContent()) {
                 jobList.add(toMap(job));

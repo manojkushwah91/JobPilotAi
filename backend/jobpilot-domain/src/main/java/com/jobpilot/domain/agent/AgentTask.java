@@ -52,6 +52,15 @@ public class AgentTask extends BaseAggregateRoot {
         return task;
     }
 
+    public static AgentTask createWithPriorityAndInput(UUID missionId, UUID userId, TaskType taskType,
+                                                        String description, int priority,
+                                                        Map<String, Object> input) {
+        var task = new AgentTask(AgentTaskId.generate(), missionId, userId, taskType, description);
+        task.priority = priority;
+        task.input = input;
+        return task;
+    }
+
     public static AgentTask reconstitute(AgentTaskId taskId, UUID missionId, UUID userId,
                                            TaskType taskType, TaskStatus status, int priority,
                                            String description, Map<String, Object> input,

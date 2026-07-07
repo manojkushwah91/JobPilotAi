@@ -1,2 +1,4 @@
-$logFile = "C:\JobPilotAi\backend.log"
-& "C:\Program Files\Java\jdk-17\bin\java.exe" -jar "C:\JobPilotAi\backend\jobpilot-bootstrap\target\jobpilot-bootstrap-1.0.0-SNAPSHOT.jar" --spring.profiles.active=dev > $logFile 2>&1
+$env:JAVA_HOME = "C:\Program Files\Java\jdk-21"
+$env:SPRING_PROFILES_ACTIVE = "dev"
+Set-Location "C:\JobPilotAi\backend"
+& mvn.cmd spring-boot:run -pl jobpilot-bootstrap 2>&1 | Tee-Object -FilePath "C:\JobPilotAi\backend.log"

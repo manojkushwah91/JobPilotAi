@@ -165,12 +165,13 @@ public class DefaultAgentRuntime implements AgentRuntime {
                         input.put("jobId", job.get("id"));
                         input.put("description", job.get("description"));
 
-                        taskService.createTaskWithPriority(
+                        taskService.createTaskWithInput(
                             mission.missionId().value(),
                             mission.userId(),
                             TaskType.SUBMIT_APPLICATION,
                             "Apply to: " + jobTitle + " at " + company,
-                            5
+                            5,
+                            input
                         );
                         log.info("Created SUBMIT_APPLICATION task for {} at {}", jobTitle, company);
                     }
