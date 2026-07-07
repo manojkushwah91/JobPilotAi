@@ -22,6 +22,7 @@ export const API = {
     tailor: (id: string) => `/resumes/${id}/tailor`,
     export: (id: string, format: string) => `/resumes/${id}/export?format=${format}`,
     upload: '/resumes/upload',
+    uploadAndParse: '/resumes/upload-and-parse',
     parse: '/resumes/parse',
   },
   coverLetters: {

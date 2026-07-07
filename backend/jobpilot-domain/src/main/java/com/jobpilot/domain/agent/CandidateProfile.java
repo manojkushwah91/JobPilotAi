@@ -119,9 +119,20 @@ public class CandidateProfile extends BaseAggregateRoot {
         this.updatedAt = Instant.now();
     }
 
+    public void updateCertifications(List<String> certifications) {
+        this.certifications = certifications != null ? new ArrayList<>(certifications) : new ArrayList<>();
+        this.updatedAt = Instant.now();
+    }
+
     public void updateResume(String resumeText, String resumeFileUrl) {
         if (resumeText != null) this.resumeText = resumeText;
         if (resumeFileUrl != null) this.resumeFileUrl = resumeFileUrl;
+        this.updatedAt = Instant.now();
+    }
+
+    public void updateLinks(String linkedinUrl, String portfolioUrl) {
+        if (linkedinUrl != null) this.linkedinUrl = linkedinUrl;
+        if (portfolioUrl != null) this.portfolioUrl = portfolioUrl;
         this.updatedAt = Instant.now();
     }
 

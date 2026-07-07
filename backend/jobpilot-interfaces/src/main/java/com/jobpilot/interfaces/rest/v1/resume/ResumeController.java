@@ -2,8 +2,10 @@ package com.jobpilot.interfaces.rest.v1.resume;
 
 import com.jobpilot.application.ai.dto.AiResumeScoreRequest;
 import com.jobpilot.application.ai.ports.AiResumeScoringPort;
+import com.jobpilot.application.agent.service.CandidateProfileService;
 import com.jobpilot.application.resume.dto.*;
 import com.jobpilot.application.resume.ports.ResumeRepository;
+import com.jobpilot.application.resume.service.ResumeParserService;
 import com.jobpilot.application.resume.usecase.*;
 import com.jobpilot.application.storage.service.FileUploadService;
 import com.jobpilot.common.model.ApiResponse;
@@ -35,6 +37,8 @@ public class ResumeController {
     private final AiResumeScoringPort aiResumeScoringPort;
     private final FileUploadService fileUploadService;
     private final ResumeRepository resumeRepository;
+    private final ResumeParserService resumeParserService;
+    private final CandidateProfileService candidateProfileService;
 
     public ResumeController(CreateResumeUseCase createResumeUseCase,
                             UpdateResumeUseCase updateResumeUseCase,
@@ -43,7 +47,9 @@ public class ResumeController {
                             ListResumesUseCase listResumesUseCase,
                             AiResumeScoringPort aiResumeScoringPort,
                             FileUploadService fileUploadService,
-                            ResumeRepository resumeRepository) {
+                            ResumeRepository resumeRepository,
+                            ResumeParserService resumeParserService,
+                            CandidateProfileService candidateProfileService) {
         this.createResumeUseCase = createResumeUseCase;
         this.updateResumeUseCase = updateResumeUseCase;
         this.deleteResumeUseCase = deleteResumeUseCase;
@@ -52,6 +58,8 @@ public class ResumeController {
         this.aiResumeScoringPort = aiResumeScoringPort;
         this.fileUploadService = fileUploadService;
         this.resumeRepository = resumeRepository;
+        this.resumeParserService = resumeParserService;
+        this.candidateProfileService = candidateProfileService;
     }
 
     @RateLimited(capacity = 100)
@@ -191,6 +199,50 @@ public class ResumeController {
             "sectionCount", 0
         );
         return ResponseEntity.ok(ApiResponse.ok(result));
+    }
+
+    @RateLimited(capacity = 10)
+    @PostMapping("/upload-and-parse")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> uploadAndParse(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal JwtPrincipal principal) throws Exception {
+        var command = new com.jobpilot.application.storage.dto.UploadFileCommand(file, "resumes");
+        var uploadResponse = fileUploadService.execute(command);
+        var fileName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "resume.pdf";
+
+        var parsed = resumeParserService.parse(file.getBytes(), fileName);
+
+        var createCommand = new CreateResumeCommand(principal.userId(), fileName.replaceAll("\\.[^.]*$", ""), List.of());
+        var resumeResponse = createResumeUseCase.execute(createCommand);
+
+        candidateProfileService.syncFromParsedResume(
+            java.util.UUID.fromString(principal.userId()),
+            parsed.fullText(),
+            parsed.email(),
+            parsed.phone(),
+            parsed.linkedinUrl(),
+            parsed.skills(),
+            parsed.sections(),
+            parsed.yearsExperience(),
+            uploadResponse.url()
+        );
+
+        var result = Map.<String, Object>of(
+            "resumeId", resumeResponse.id(),
+            "title", fileName,
+            "filePath", uploadResponse.url(),
+            "fileSize", uploadResponse.size(),
+            "parsed", Map.of(
+                "email", parsed.email() != null ? parsed.email() : "",
+                "phone", parsed.phone() != null ? parsed.phone() : "",
+                "linkedinUrl", parsed.linkedinUrl() != null ? parsed.linkedinUrl() : "",
+                "skills", parsed.skills(),
+                "sections", parsed.sections(),
+                "yearsExperience", parsed.yearsExperience()
+            ),
+            "profileSynced", true
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(result));
     }
 
     @RateLimited(capacity = 50)

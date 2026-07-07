@@ -76,6 +76,52 @@ public class CandidateProfileService {
         return repository.save(profile);
     }
 
+    public CandidateProfile syncFromParsedResume(UUID userId, String fullText, String email,
+                                                   String phone, String linkedinUrl,
+                                                   java.util.List<String> skills,
+                                                   java.util.List<java.util.Map<String, String>> sections,
+                                                   int yearsExperience, String resumeFileUrl) {
+        var profile = getOrCreateForUpdate(userId, null, email);
+
+        if (linkedinUrl != null && !linkedinUrl.isBlank()) {
+            profile.updateLinks(linkedinUrl, null);
+        }
+
+        if (skills != null && !skills.isEmpty()) {
+            profile.updateSkills(skills);
+        }
+
+        var experience = new java.util.ArrayList<String>();
+        var education = new java.util.ArrayList<String>();
+        var certifications = new java.util.ArrayList<String>();
+        String summary = null;
+
+        for (var section : sections) {
+            var type = section.getOrDefault("type", "").toUpperCase();
+            var content = section.getOrDefault("content", "");
+            if (content.isBlank()) continue;
+
+            switch (type) {
+                case "EXPERIENCE" -> experience.add(content);
+                case "EDUCATION" -> education.add(content);
+                case "CERTIFICATIONS" -> certifications.add(content);
+                case "SUMMARY" -> summary = content;
+                default -> {}
+            }
+        }
+
+        if (!experience.isEmpty()) profile.updateExperience(experience);
+        if (!education.isEmpty()) profile.updateEducation(education);
+        if (!certifications.isEmpty()) profile.updateCertifications(certifications);
+        if (summary != null) {
+            profile.updateProfile(profile.fullName(), profile.phone(), profile.location(), profile.headline(), summary);
+        }
+
+        profile.updateResume(fullText, resumeFileUrl);
+
+        return repository.save(profile);
+    }
+
     public void delete(UUID userId) {
         var profile = repository.findByUserId(userId)
             .orElseThrow(() -> new RuntimeException("Profile not found for user: " + userId));
