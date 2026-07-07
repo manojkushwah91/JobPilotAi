@@ -219,14 +219,33 @@ public class DefaultAgentRuntime implements AgentRuntime {
                     && t.status() == TaskStatus.COMPLETED);
 
             if (!hasRecentDiscovery) {
-                taskService.createTaskWithPriority(
-                    mission.missionId().value(),
-                    mission.userId(),
-                    TaskType.DISCOVER_JOBS,
-                    "Discover new jobs matching mission criteria",
-                    10
-                );
-                log.info("Created DISCOVER_JOBS task for mission {}", mission.missionId());
+                var totalJobsInDb = missionTasks.stream()
+                    .filter(t -> t.taskType() == TaskType.DISCOVER_JOBS && t.status() == TaskStatus.COMPLETED)
+                    .count();
+
+                if (totalJobsInDb == 0) {
+                    for (var board : List.of("indeed", "linkedin")) {
+                        taskService.createTaskWithInput(
+                            mission.missionId().value(),
+                            mission.userId(),
+                            TaskType.DISCOVER_JOBS,
+                            "Scrape jobs from " + board,
+                            10,
+                            Map.of("board", board, "query", mission.targetRole(),
+                                "location", mission.targetLocation() != null ? mission.targetLocation() : "")
+                        );
+                    }
+                    log.info("Created SCRAPE_JOBS tasks for indeed + linkedin");
+                } else {
+                    taskService.createTaskWithPriority(
+                        mission.missionId().value(),
+                        mission.userId(),
+                        TaskType.DISCOVER_JOBS,
+                        "Discover new jobs matching mission criteria",
+                        10
+                    );
+                    log.info("Created DISCOVER_JOBS task for mission {}", mission.missionId());
+                }
             }
         }
 
@@ -258,6 +277,11 @@ public class DefaultAgentRuntime implements AgentRuntime {
                         enrichedInput.putIfAbsent("query", mission.targetRole());
                         enrichedInput.putIfAbsent("location", mission.targetLocation());
                         enrichedInput.putIfAbsent("skills", String.join(", ", mission.preferredSkills()));
+                    }
+
+                    if (task.taskType() == TaskType.DISCOVER_JOBS && enrichedInput.containsKey("board")) {
+                        enrichedInput.putIfAbsent("query", mission.targetRole());
+                        enrichedInput.putIfAbsent("location", mission.targetLocation());
                     }
 
                     if (task.taskType() == TaskType.SUBMIT_APPLICATION) {
