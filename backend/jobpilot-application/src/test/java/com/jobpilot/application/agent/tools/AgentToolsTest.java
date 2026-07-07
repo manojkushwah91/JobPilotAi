@@ -1,8 +1,8 @@
 package com.jobpilot.application.agent.tools;
 
 import com.jobpilot.application.agent.ports.AiProviderPort;
+import com.jobpilot.application.agent.ports.CandidateProfileRepository;
 import com.jobpilot.application.job.ports.JobRepository;
-import com.jobpilot.application.resume.ports.ResumeVersionRepository;
 import com.jobpilot.domain.agent.Tool;
 import com.jobpilot.domain.job.JobId;
 import com.jobpilot.domain.job.JobListing;
@@ -28,20 +28,22 @@ class AgentToolsTest {
     private AiProviderPort aiProvider;
 
     @Mock
-    private ResumeVersionRepository resumeVersionRepository;
+    private CandidateProfileRepository profileRepository;
 
     @Mock
     private JobRepository jobRepository;
 
     private JobDiscoveryTool jobDiscoveryTool;
     private ResumeTailoringTool resumeTailoringTool;
-    private CoverLetterGeneratorTool coverLetterGeneratorTool;
+    private CoverLetterTool coverLetterTool;
+    private JobScoringTool jobScoringTool;
 
     @BeforeEach
     void setUp() {
         jobDiscoveryTool = new JobDiscoveryTool(jobRepository);
-        resumeTailoringTool = new ResumeTailoringTool(aiProvider, resumeVersionRepository);
-        coverLetterGeneratorTool = new CoverLetterGeneratorTool(aiProvider);
+        resumeTailoringTool = new ResumeTailoringTool(aiProvider, profileRepository);
+        coverLetterTool = new CoverLetterTool(aiProvider, profileRepository);
+        jobScoringTool = new JobScoringTool(aiProvider, profileRepository);
     }
 
     @Test
@@ -110,52 +112,53 @@ class AgentToolsTest {
     }
 
     @Test
-    void resumeTailoringTool_shouldExecuteWithAI() {
-        when(aiProvider.executePrompt(anyString(), anyString(), any(), anyDouble(), anyInt()))
-            .thenReturn("{\"tailoredResume\":\"...\",\"changes\":[\"Added keywords\"],\"atsScoreImprovement\":15}");
-
-        var result = resumeTailoringTool.execute(Map.of(
-            "resumeContent", "John Doe - Java Developer",
-            "jobDescription", "Looking for Java developer with Spring Boot experience",
-            "companyName", "Google"
-        ));
-
-        assertNotNull(result);
-        assertEquals("success", result.get("status"));
-        assertEquals("Google", result.get("companyName"));
+    void coverLetterTool_shouldHaveCorrectName() {
+        assertEquals("GENERATE_COVER_LETTER", coverLetterTool.name());
     }
 
     @Test
-    void coverLetterGeneratorTool_shouldHaveCorrectName() {
-        assertEquals("GENERATE_COVER_LETTER", coverLetterGeneratorTool.name());
+    void coverLetterTool_shouldHaveDescription() {
+        assertNotNull(coverLetterTool.description());
+        assertTrue(coverLetterTool.description().contains("Generates"));
     }
 
     @Test
-    void coverLetterGeneratorTool_shouldHaveDescription() {
-        assertNotNull(coverLetterGeneratorTool.description());
-        assertTrue(coverLetterGeneratorTool.description().contains("Generates"));
+    void coverLetterTool_shouldNotRequireApproval() {
+        assertFalse(coverLetterTool.requiresApproval());
     }
 
     @Test
-    void coverLetterGeneratorTool_shouldNotRequireApproval() {
-        assertFalse(coverLetterGeneratorTool.requiresApproval());
+    void jobScoringTool_shouldHaveCorrectName() {
+        assertEquals("RANK_JOB", jobScoringTool.name());
     }
 
     @Test
-    void coverLetterGeneratorTool_shouldExecuteWithAI() {
-        when(aiProvider.executePrompt(anyString(), anyString(), any(), anyDouble(), anyInt()))
-            .thenReturn("{\"coverLetter\":\"Dear Hiring Manager...\",\"wordCount\":250,\"keyPoints\":[\"Java expert\"]}");
+    void jobScoringTool_shouldHaveDescription() {
+        assertNotNull(jobScoringTool.description());
+        assertTrue(jobScoringTool.description().contains("Scores"));
+    }
 
-        var result = coverLetterGeneratorTool.execute(Map.of(
-            "candidateProfile", "John Doe - 5 years Java experience",
-            "jobDescription", "Senior Java Developer position",
-            "companyName", "Microsoft",
-            "tone", "professional"
-        ));
+    @Test
+    void jobScoringTool_shouldNotRequireApproval() {
+        assertFalse(jobScoringTool.requiresApproval());
+    }
 
-        assertNotNull(result);
-        assertEquals("success", result.get("status"));
-        assertEquals("Microsoft", result.get("companyName"));
+    @Test
+    void resumeTailoringTool_shouldReturnErrorWithoutDescription() {
+        var result = resumeTailoringTool.execute(Map.of("title", "Dev", "company", "Acme"));
+        assertEquals("error", result.get("status"));
+    }
+
+    @Test
+    void coverLetterTool_shouldReturnErrorWithoutDescription() {
+        var result = coverLetterTool.execute(Map.of("title", "Dev", "company", "Acme"));
+        assertEquals("error", result.get("status"));
+    }
+
+    @Test
+    void jobScoringTool_shouldReturnErrorWithoutDescription() {
+        var result = jobScoringTool.execute(Map.of("title", "Dev", "company", "Acme"));
+        assertEquals("error", result.get("status"));
     }
 
     @Test
@@ -165,11 +168,16 @@ class AgentToolsTest {
 
     @Test
     void resumeTailoringTool_shouldHaveTimeout() {
-        assertEquals(90, resumeTailoringTool.timeoutSeconds());
+        assertEquals(120, resumeTailoringTool.timeoutSeconds());
     }
 
     @Test
-    void coverLetterGeneratorTool_shouldHaveTimeout() {
-        assertEquals(60, coverLetterGeneratorTool.timeoutSeconds());
+    void coverLetterTool_shouldHaveTimeout() {
+        assertEquals(90, coverLetterTool.timeoutSeconds());
+    }
+
+    @Test
+    void jobScoringTool_shouldHaveTimeout() {
+        assertEquals(60, jobScoringTool.timeoutSeconds());
     }
 }

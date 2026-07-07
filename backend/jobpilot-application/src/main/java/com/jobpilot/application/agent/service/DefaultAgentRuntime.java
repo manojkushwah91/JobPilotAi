@@ -155,15 +155,41 @@ public class DefaultAgentRuntime implements AgentRuntime {
                         var jobUrl = (String) job.getOrDefault("url", "");
                         var jobTitle = (String) job.getOrDefault("title", "Unknown");
                         var company = (String) job.getOrDefault("company", "Unknown");
+                        var description = (String) job.getOrDefault("description", "");
 
                         if (jobUrl.isBlank()) continue;
+
+                        var scoreResult = scoreJob(mission, jobTitle, company, description);
+                        var score = scoreResult != null ? ((Number) scoreResult.getOrDefault("score", 0)).intValue() : 50;
+                        var recommendation = scoreResult != null ? (String) scoreResult.getOrDefault("recommendation", "maybe") : "maybe";
+
+                        log.info("Job score: {} at {} = {}/100 ({})", jobTitle, company, score, recommendation);
+
+                        if (score < 50 && "skip".equals(recommendation)) {
+                            log.info("Skipping low-score job: {} at {} (score: {})", jobTitle, company, score);
+                            continue;
+                        }
 
                         var input = new LinkedHashMap<String, Object>();
                         input.put("url", jobUrl);
                         input.put("title", jobTitle);
                         input.put("company", company);
                         input.put("jobId", job.get("id"));
-                        input.put("description", job.get("description"));
+                        input.put("description", description);
+                        input.put("matchScore", score);
+                        input.put("matchRecommendation", recommendation);
+
+                        if (score >= 60) {
+                            var tailored = tailorResume(mission, jobTitle, company, description);
+                            if (tailored != null && "success".equals(tailored.get("status"))) {
+                                input.put("tailoredResume", tailored.get("tailoredResume"));
+                            }
+
+                            var coverLetter = generateCoverLetter(mission, jobTitle, company, description);
+                            if (coverLetter != null && "success".equals(coverLetter.get("status"))) {
+                                input.put("coverLetter", coverLetter.get("coverLetter"));
+                            }
+                        }
 
                         taskService.createTaskWithInput(
                             mission.missionId().value(),
@@ -173,7 +199,7 @@ public class DefaultAgentRuntime implements AgentRuntime {
                             5,
                             input
                         );
-                        log.info("Created SUBMIT_APPLICATION task for {} at {}", jobTitle, company);
+                        log.info("Created SUBMIT_APPLICATION task for {} at {} (score: {})", jobTitle, company, score);
                     }
 
                     discoveryTask.output().put("processed", true);
@@ -235,6 +261,12 @@ public class DefaultAgentRuntime implements AgentRuntime {
                     }
 
                     if (task.taskType() == TaskType.SUBMIT_APPLICATION) {
+                        enrichedInput.putIfAbsent("userId", mission.userId());
+                    }
+
+                    if (task.taskType() == TaskType.TAILOR_RESUME
+                            || task.taskType() == TaskType.GENERATE_COVER_LETTER
+                            || task.taskType() == TaskType.RANK_JOB) {
                         enrichedInput.putIfAbsent("userId", mission.userId());
                     }
 
@@ -387,5 +419,53 @@ public class DefaultAgentRuntime implements AgentRuntime {
         status.put("activeMissions", runningMissions.size());
         status.put("runningMissions", new ArrayList<>(runningMissions.keySet()));
         return status;
+    }
+
+    private Map<String, Object> scoreJob(Mission mission, String jobTitle, String company, String description) {
+        try {
+            var tool = toolRegistry.findByName("RANK_JOB");
+            if (tool.isEmpty()) return null;
+            var input = new LinkedHashMap<String, Object>();
+            input.put("title", jobTitle);
+            input.put("company", company);
+            input.put("description", description);
+            input.put("userId", mission.userId());
+            return tool.get().execute(input);
+        } catch (Exception e) {
+            log.warn("Job scoring failed for {} at {}: {}", jobTitle, company, e.getMessage());
+            return null;
+        }
+    }
+
+    private Map<String, Object> tailorResume(Mission mission, String jobTitle, String company, String description) {
+        try {
+            var tool = toolRegistry.findByName("TAILOR_RESUME");
+            if (tool.isEmpty()) return null;
+            var input = new LinkedHashMap<String, Object>();
+            input.put("title", jobTitle);
+            input.put("company", company);
+            input.put("description", description);
+            input.put("userId", mission.userId());
+            return tool.get().execute(input);
+        } catch (Exception e) {
+            log.warn("Resume tailoring failed for {} at {}: {}", jobTitle, company, e.getMessage());
+            return null;
+        }
+    }
+
+    private Map<String, Object> generateCoverLetter(Mission mission, String jobTitle, String company, String description) {
+        try {
+            var tool = toolRegistry.findByName("GENERATE_COVER_LETTER");
+            if (tool.isEmpty()) return null;
+            var input = new LinkedHashMap<String, Object>();
+            input.put("title", jobTitle);
+            input.put("company", company);
+            input.put("description", description);
+            input.put("userId", mission.userId());
+            return tool.get().execute(input);
+        } catch (Exception e) {
+            log.warn("Cover letter generation failed for {} at {}: {}", jobTitle, company, e.getMessage());
+            return null;
+        }
     }
 }
