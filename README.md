@@ -16,6 +16,24 @@ JobPilot AI is a fully autonomous AI-powered job application agent. You sign up,
 
 **The AI applies. You supervise.**
 
+## Screenshots
+
+| Login | Dashboard |
+|-------|-----------|
+| ![Login](screenshots/login.png) | ![Dashboard](screenshots/dashboard.png) |
+
+| Agent Chat | Jobs |
+|------------|------|
+| ![Agent Chat](screenshots/agent-chat.png) | ![Jobs](screenshots/jobs.png) |
+
+| Applications | Settings |
+|--------------|----------|
+| ![Applications](screenshots/applications.png) | ![Settings](screenshots/settings.png) |
+
+| Indeed Scraping | Portal Detection |
+|-----------------|-------------------|
+| ![Indeed](screenshots/indeed_scrape.png) | Auto-detects 16 portal types |
+
 ## Features
 
 ### AI-Powered Job Intelligence
