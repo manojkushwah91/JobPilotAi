@@ -68,7 +68,7 @@ public class PortalDetector implements PortalDetectorPort {
             "submit", "button[type='submit']"
         ),
         "smartrecruiters", Map.of(
-            "firstName", "input[data-test='candidateFirstNam input']",
+            "firstName", "input[data-test='candidateFirstName']",
             "lastName", "input[data-test='candidateLastName']",
             "email", "input[data-test='candidateEmail']",
             "phone", "input[data-test='candidatePhone']",

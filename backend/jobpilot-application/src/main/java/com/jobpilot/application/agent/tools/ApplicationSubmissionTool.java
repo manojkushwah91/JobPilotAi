@@ -120,26 +120,65 @@ public class ApplicationSubmissionTool implements Tool {
             var filledFields = new ArrayList<String>();
             var skippedFields = new ArrayList<String>();
 
-            for (var field : fields) {
-                var selector = (String) field.get("selector");
-                var fieldType = (String) field.get("type");
-                var label = (String) field.getOrDefault("label", "");
-                var name = (String) field.getOrDefault("name", "");
-                var required = (Boolean) field.getOrDefault("required", false);
+            var portalSelectors = Map.<String, String>of();
+            if (portalDetector != null && !"unknown".equals(portalType)) {
+                portalSelectors = portalDetector.getPortalSelectors(portalType);
+            }
 
-                var matchResult = matchFieldToProfile(label, name, fieldType, profileData);
-                if (matchResult != null) {
+            if (!portalSelectors.isEmpty()) {
+                var mapping = buildPortalFieldMapping(portalType, profileData);
+                for (var entry : mapping.entrySet()) {
+                    var selector = portalSelectors.get(entry.getKey());
+                    var value = entry.getValue();
+                    if (selector != null && value != null && !value.isBlank()) {
+                        try {
+                            fillFieldByType(selector, "text", value);
+                            filledCount++;
+                            filledFields.add(entry.getKey());
+                            log.info("Portal fill: {} = {} via {}", entry.getKey(), selector, portalType);
+                        } catch (Exception e) {
+                            log.warn("Portal fill failed for {}: {}", entry.getKey(), e.getMessage());
+                            skippedFields.add(entry.getKey());
+                        }
+                    }
+                }
+
+                var resumeSelector = portalSelectors.get("resume");
+                var fileUrl = (String) profileData.get("resumeFileUrl");
+                if (resumeSelector != null && fileUrl != null && !fileUrl.isBlank()) {
                     try {
-                        fillFieldByType(selector, fieldType, matchResult);
+                        fillFieldByType(resumeSelector, "file", fileUrl);
                         filledCount++;
-                        filledFields.add(label.isEmpty() ? name : label);
-                        log.info("Filled field '{}' ({}) with profile data", label.isEmpty() ? name : label, fieldType);
+                        filledFields.add("resume");
                     } catch (Exception e) {
-                        log.warn("Failed to fill field {}: {}", selector, e.getMessage());
+                        log.warn("Resume upload failed: {}", e.getMessage());
+                    }
+                }
+
+                var submitSelector = portalSelectors.get("submit");
+                if (submitSelector != null) {
+                    log.info("Portal submit button: {} for {}", submitSelector, portalType);
+                }
+            } else {
+                for (var field : fields) {
+                    var selector = (String) field.get("selector");
+                    var fieldType = (String) field.get("type");
+                    var label = (String) field.getOrDefault("label", "");
+                    var name = (String) field.getOrDefault("name", "");
+
+                    var matchResult = matchFieldToProfile(label, name, fieldType, profileData);
+                    if (matchResult != null) {
+                        try {
+                            fillFieldByType(selector, fieldType, matchResult);
+                            filledCount++;
+                            filledFields.add(label.isEmpty() ? name : label);
+                        } catch (Exception e) {
+                            log.warn("Failed to fill field {}: {}", selector, e.getMessage());
+                            skippedFields.add(label.isEmpty() ? name : label);
+                        }
+                    } else if ((Boolean) field.getOrDefault("required", false)) {
                         skippedFields.add(label.isEmpty() ? name : label);
                     }
-                } else if (required) {
-                    skippedFields.add(label.isEmpty() ? name : label);
                 }
             }
 
@@ -177,6 +216,66 @@ public class ApplicationSubmissionTool implements Tool {
                 log.warn("Failed to close browser: {}", e.getMessage());
             }
         }
+    }
+
+    private Map<String, String> buildPortalFieldMapping(String portalType, Map<String, Object> profile) {
+        var mapping = new LinkedHashMap<String, String>();
+        if (profile.isEmpty()) return mapping;
+
+        var fullName = (String) profile.getOrDefault("fullName", "");
+        var parts = fullName.split(" ", 2);
+        var firstName = parts.length > 0 ? parts[0] : "";
+        var lastName = parts.length > 1 ? parts[1] : "";
+
+        var email = (String) profile.getOrDefault("email", "");
+        var phone = (String) profile.getOrDefault("phone", "");
+        var location = (String) profile.getOrDefault("location", "");
+        var linkedin = (String) profile.getOrDefault("linkedinUrl", "");
+        var portfolio = (String) profile.getOrDefault("portfolioUrl", "");
+        var summary = (String) profile.getOrDefault("summary", "");
+        var headline = (String) profile.getOrDefault("headline", "");
+
+        switch (portalType) {
+            case "greenhouse", "greenhouse-form" -> {
+                mapping.put("firstName", firstName);
+                mapping.put("lastName", lastName);
+                mapping.put("email", email);
+                mapping.put("phone", phone);
+                if (summary != null && !summary.isBlank()) mapping.put("coverLetter", summary);
+            }
+            case "lever", "lever-form" -> {
+                mapping.put("name", fullName);
+                mapping.put("email", email);
+                mapping.put("phone", phone);
+                if (linkedin != null && !linkedin.isBlank()) mapping.put("urls", linkedin);
+            }
+            case "workday" -> {
+                mapping.put("firstName", firstName);
+                mapping.put("lastName", lastName);
+                mapping.put("email", email);
+                mapping.put("phone", phone);
+            }
+            case "ashby" -> {
+                mapping.put("name", fullName);
+                mapping.put("email", email);
+                mapping.put("phone", phone);
+            }
+            case "smartrecruiters" -> {
+                mapping.put("firstName", firstName);
+                mapping.put("lastName", lastName);
+                mapping.put("email", email);
+                mapping.put("phone", phone);
+            }
+            default -> {
+                mapping.put("firstName", firstName);
+                mapping.put("lastName", lastName);
+                mapping.put("email", email);
+                mapping.put("phone", phone);
+                if (linkedin != null && !linkedin.isBlank()) mapping.put("linkedin", linkedin);
+                if (portfolio != null && !portfolio.isBlank()) mapping.put("portfolio", portfolio);
+            }
+        }
+        return mapping;
     }
 
     private String findAndClickApplyButton() {
