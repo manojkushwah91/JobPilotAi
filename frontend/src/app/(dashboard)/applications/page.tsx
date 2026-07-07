@@ -20,7 +20,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { Plus, LayoutGrid, List } from 'lucide-react';
+import { Plus, LayoutGrid, List, ClipboardList, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
 const COLUMNS: ApplicationStatus[] = [
@@ -41,7 +41,6 @@ export default function ApplicationsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newJobId, setNewJobId] = useState('');
   const [newStatus, setNewStatus] = useState<ApplicationStatus>('SAVED');
-  const [companyFilter, setCompanyFilter] = useState('');
 
   const { data, isLoading, isError } = useApiQuery<Application[]>(['applications'], API.applications.list);
 
@@ -82,28 +81,53 @@ export default function ApplicationsPage() {
     {} as Record<ApplicationStatus, Application[]>
   );
 
-  if (isError) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <p className="text-destructive">Failed to load applications</p>
-        <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>Try Again</Button>
-      </div>
-    );
-  }
+  const stats = {
+    total: applications.length,
+    active: applications.filter(a => !['REJECTED', 'ACCEPTED', 'WITHDRAWN'].includes(a.status)).length,
+    interviews: applications.filter(a => ['PHONE_SCREEN', 'TECHNICAL_INTERVIEW', 'ONSITE_INTERVIEW'].includes(a.status)).length,
+    offers: applications.filter(a => a.status === 'OFFER').length,
+  };
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Applications</h1>
-          <p className="text-sm text-muted-foreground">Track your job applications</p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-mesh p-6">
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span className="text-xs font-medium text-primary">Pipeline View</span>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight mb-1">Applications</h1>
+          <p className="text-muted-foreground">
+            {stats.total} total • {stats.active} active • {stats.interviews} in interviews • {stats.offers} offers
+          </p>
+        </div>
+        <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/5 blur-3xl" />
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {viewMode === 'table' && (
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40 h-10 glass border-border/50">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 rounded-md border p-1">
+          <div className="flex items-center gap-1 rounded-lg border border-border/50 bg-background/50 p-1">
             <Button
               variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
               size="icon"
-              className="h-8 w-8"
+              className="h-9 w-9"
               onClick={() => setViewMode('kanban')}
             >
               <LayoutGrid className="h-4 w-4" />
@@ -111,43 +135,28 @@ export default function ApplicationsPage() {
             <Button
               variant={viewMode === 'table' ? 'secondary' : 'ghost'}
               size="icon"
-              className="h-8 w-8"
+              className="h-9 w-9"
               onClick={() => setViewMode('table')}
             >
               <List className="h-4 w-4" />
             </Button>
           </div>
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
+          <Button onClick={() => setCreateOpen(true)} className="bg-gradient-primary hover:opacity-90 gap-2">
+            <Plus className="h-4 w-4" />
             Log Application
           </Button>
         </div>
       </div>
 
-      {viewMode === 'table' && (
-        <div className="mb-4 flex items-center gap-2">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="All Statuses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                <SelectItem key={key} value={key}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
+      {/* Content */}
       {isLoading ? (
         viewMode === 'kanban' ? (
           <div className="flex gap-4 overflow-x-auto pb-4">
             {COLUMNS.map((s) => (
               <div key={s} className="w-64 shrink-0 space-y-3">
-                <Skeleton className="h-6 w-24" />
+                <div className="skeleton-premium h-6 w-24 rounded-lg" />
                 {Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-28 w-full rounded-xl" />
+                  <div key={i} className="skeleton-premium h-28 w-full rounded-xl" />
                 ))}
               </div>
             ))}
@@ -155,44 +164,47 @@ export default function ApplicationsPage() {
         ) : (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full rounded-lg" />
+              <div key={i} className="skeleton-premium h-12 w-full rounded-lg" />
             ))}
           </div>
         )
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <LayoutGrid className="mb-4 h-16 w-16 text-muted-foreground" />
+        <div className="flex flex-col items-center justify-center py-20 glass rounded-xl">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/50">
+            <ClipboardList className="h-8 w-8 text-muted-foreground" />
+          </div>
           <h3 className="mb-2 text-lg font-medium">
-            {applications.length === 0 ? 'Start applying to track your applications' : 'No applications match your filters'}
+            {applications.length === 0 ? 'No applications yet' : 'No applications match your filters'}
           </h3>
-          <p className="mb-6 text-sm text-muted-foreground">
+          <p className="mb-6 text-sm text-muted-foreground text-center max-w-sm">
             {applications.length === 0
-              ? 'Log your first application to begin tracking'
+              ? 'Start applying to jobs and track your progress here'
               : 'Try adjusting your filters'}
           </p>
           {applications.length === 0 && (
-            <Button onClick={() => setCreateOpen(true)}>
+            <Button onClick={() => setCreateOpen(true)} className="bg-gradient-primary hover:opacity-90">
               <Plus className="mr-2 h-4 w-4" />
-              Log Application
+              Log First Application
             </Button>
           )}
         </div>
       ) : viewMode === 'kanban' ? (
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {COLUMNS.map((status) => (
-            <KanbanColumn
-              key={status}
-              status={status}
-              applications={groupedByStatus[status]}
-              onStatusChange={handleStatusChange}
-            />
+        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-premium">
+          {COLUMNS.map((status, i) => (
+            <div key={status} className="animate-fade-in" style={{ animationDelay: `${i * 50}ms` }}>
+              <KanbanColumn
+                status={status}
+                applications={groupedByStatus[status]}
+                onStatusChange={handleStatusChange}
+              />
+            </div>
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="glass rounded-xl overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="border-border/50">
                 <TableHead>Status</TableHead>
                 <TableHead>Applied</TableHead>
                 <TableHead>Updated</TableHead>
@@ -200,8 +212,8 @@ export default function ApplicationsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((app) => (
-                <TableRow key={app.id}>
+              {filtered.map((app, i) => (
+                <TableRow key={app.id} className="border-border/30 hover:bg-muted/30 animate-fade-in" style={{ animationDelay: `${i * 30}ms` }}>
                   <TableCell>
                     <Link href={`/applications/${app.id}`} className="flex items-center gap-2">
                       <StatusBadge status={app.status} />
@@ -214,7 +226,7 @@ export default function ApplicationsPage() {
                     {new Date(app.updatedAt).toLocaleDateString()}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" asChild>
+                    <Button variant="ghost" size="sm" asChild className="hover-lift">
                       <Link href={`/applications/${app.id}`}>View</Link>
                     </Button>
                   </TableCell>
@@ -225,8 +237,9 @@ export default function ApplicationsPage() {
         </div>
       )}
 
+      {/* Create Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
+        <DialogContent className="glass-strong">
           <DialogHeader>
             <DialogTitle>Log Application</DialogTitle>
             <DialogDescription>Track a new job application</DialogDescription>
@@ -261,6 +274,7 @@ export default function ApplicationsPage() {
             <Button
               onClick={() => createMutation.mutate({ jobListingId: newJobId, status: newStatus })}
               disabled={!newJobId.trim() || createMutation.isPending}
+              className="bg-gradient-primary hover:opacity-90"
             >
               {createMutation.isPending ? 'Logging...' : 'Log Application'}
             </Button>
