@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useApiQuery, useApiMutation } from '@/lib/hooks/useQuery';
 import { API } from '@/lib/api/endpoints';
+import apiClient from '@/lib/api/client';
 import type { Resume } from '@/types';
 import { ResumeCard } from '@/components/features/resumes/ResumeCard';
 import { Button } from '@/components/ui/button';
@@ -13,15 +14,17 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Plus, FileText, Search } from 'lucide-react';
+import { Plus, FileText, Search, Upload, Loader2 } from 'lucide-react';
 
 export default function ResumesPage() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [uploading, setUploading] = useState(false);
 
-  const { data, isLoading, isError } = useApiQuery<Resume[]>(['resumes'], API.resumes.list);
+  const { data, isLoading, isError, refetch } = useApiQuery<Resume[]>(['resumes'], API.resumes.list);
 
   const createMutation = useApiMutation<Resume, { title: string }>('POST', API.resumes.list, {
     onSuccess: (res) => {
@@ -32,6 +35,29 @@ export default function ResumesPage() {
     },
     onError: () => toast.error('Failed to create resume'),
   });
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await apiClient.post(API.resumes.uploadAndParse, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const parsed = res.data?.data?.parsed;
+      toast.success(`Resume parsed! Found ${parsed?.skills?.length || 0} skills, profile auto-populated.`);
+      refetch();
+      router.push('/settings/profile');
+    } catch {
+      toast.error('Failed to upload and parse resume');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const resumes = data?.data ?? [];
   const filtered = resumes.filter((r) =>
@@ -56,7 +82,23 @@ export default function ResumesPage() {
           <h1 className="text-2xl font-bold">Resumes</h1>
           <p className="text-sm text-muted-foreground">Manage your resumes and optimize them for ATS</p>
         </div>
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,.doc,.txt"
+            className="hidden"
+            onChange={handleUpload}
+          />
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+            {uploading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="mr-2 h-4 w-4" />
+            )}
+            {uploading ? 'Parsing...' : 'Upload Resume'}
+          </Button>
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
@@ -90,6 +132,7 @@ export default function ResumesPage() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="relative mb-6 max-w-md">
