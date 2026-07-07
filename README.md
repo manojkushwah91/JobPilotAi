@@ -1,263 +1,294 @@
-# JobPilot AI v2.0 🤖
+# JobPilot AI
 
-> Offline-First Autonomous AI Job Agent — The AI works 24/7 to get you interviews while you supervise.
+> Autonomous AI Job Agent — The AI applies to jobs 24/7 while you supervise.
 
-[![Build](https://img.shields.io/badge/build-passing-brightgreen)]()
-[![Java](https://img.shields.io/badge/Java-21-orange)]()
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3-green)]()
-[![Next.js](https://img.shields.io/badge/Next.js-14-black)]()
-[![Ollama](https://img.shields.io/badge/Ollama-Default-blue)]()
-[![License](https://img.shields.io/badge/license-MIT-blue)]()
+[![Build](https://img.shields.io/github/actions/workflow/status/manojkushwah91/JobPilotAi/build.yml?branch=main&label=build)](https://github.com/manojkushwah91/JobPilotAi/actions)
+[![Tests](https://img.shields.io/github/actions/workflow/status/manojkushwah91/JobPilotAi/build.yml?branch=main&label=tests)](https://github.com/manojkushwah91/JobPilotAi/actions)
+[![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## ✨ What is JobPilot AI?
+## What is JobPilot AI?
 
-JobPilot AI is **not** a job portal. It is **not** LinkedIn. It is **not** Indeed. It is **not** another CRUD dashboard.
+JobPilot AI is a fully autonomous AI-powered job application agent. You sign up, fill your profile once, and the AI takes over — scraping jobs from multiple boards, scoring match quality, tailoring your resume per job, generating cover letters, filling application forms via browser automation, and monitoring your email for responses.
 
-**JobPilot AI is an offline-first autonomous AI job agent.**
+**The AI applies. You supervise.**
 
-You provide your resume and preferences once. The AI continuously searches for suitable jobs, analyzes every opportunity, tailors resumes, generates cover letters, fills application forms, and submits applications—all while you monitor progress through Mission Control.
+## Features
 
-**The AI executes. You supervise.**
-
-## 🎯 Core Philosophy
-
-- **Agent-Centric:** Everything revolves around the Agent Runtime
-- **Offline-First:** Default AI provider is Ollama (local). Cloud AI is optional.
-- **Mission-Driven:** You define Missions, the agent executes autonomously.
-- **Memory-Persistent:** The agent learns and remembers across sessions.
-- **Privacy-First:** Your data stays on your machine by default.
-
-## 🚀 Key Features
-
+### AI-Powered Job Intelligence
 | Feature | Description |
 |---------|-------------|
-| **🤖 Agent Runtime** | Autonomous agent that executes Observe-Think-Plan-Execute-Verify-Learn loop |
-| **🎯 Mission Control** | Define job hunting goals (salary, locations, companies, limits) |
-| **🧠 AI Tools** | Resume parsing, job analysis, resume tailoring, cover letter generation (Ollama) |
-| **🌐 Browser Automation** | Generic automation framework with site adapters (LinkedIn, Indeed, etc.) |
-| **💾 Long-Term Memory** | Agent remembers preferences, outcomes, strategies across sessions |
-| **💬 Chat Interface** | Natural language control: "Find remote Java jobs", "Pause until tomorrow" |
-| **📊 Real-Time Monitoring** | Agent status, current task, progress, timeline, logs |
-| **🔐 Privacy-First** | Local AI inference (Ollama), data never leaves your machine by default |
+| **Job Match Scoring** | AI scores every job 0-100 based on skills, experience, education, location, and salary fit |
+| **Resume Tailoring** | AI rewrites your resume to match each job's keywords and requirements |
+| **Cover Letter Generation** | AI writes personalized cover letters for each application |
+| **ATS Resume Analyzer** | Analyzes your resume against job descriptions for ATS compatibility |
+| **Interview Preparation** | Generates technical/behavioral questions, STAR method answers, and strategy |
+| **Company Intelligence** | Researches company culture, financials, competitors, and interview insights |
 
-## 🏗 Architecture
+### Autonomous Browser Automation
+| Feature | Description |
+|---------|-------------|
+| **Multi-Board Scraping** | Scrapes jobs from Indeed, LinkedIn with full descriptions |
+| **Portal Detection** | Auto-detects 16 portal types (Greenhouse, Lever, Workday, etc.) |
+| **Smart Form Filling** | Portal-specific selectors for accurate form completion |
+| **Cookie Persistence** | Saves sessions per portal to avoid re-login |
+| **CAPTCHA Handling** | Detects CAPTCHAs and pauses for manual resolution |
+| **Stealth Mode** | User agent rotation, anti-detection, random delays |
+
+### Agent Runtime
+| Feature | Description |
+|---------|-------------|
+| **Autonomous Loop** | Observe → Score → Tailor → Apply → Verify → Learn |
+| **Mission Control** | Define goals, set daily limits, monitor progress |
+| **Long-Term Memory** | Agent learns from successes and failures across sessions |
+| **Email Monitoring** | Detects interview invites, rejections, and offers |
+| **Real-Time Chat** | Natural language control: "Find remote Java jobs", "Pause until tomorrow" |
+
+### Production Infrastructure
+| Feature | Description |
+|---------|-------------|
+| **CI/CD Pipeline** | GitHub Actions: build, test, security scan, release |
+| **Dockerized** | Multi-stage Dockerfiles, docker-compose for dev and prod |
+| **Monitoring** | Prometheus + Grafana dashboards, structured logging |
+| **API Docs** | SpringDoc OpenAPI with Swagger UI |
+| **Architecture** | C4 Architecture diagrams (Level 1-4) |
+
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│              Mission Control (Frontend)          │
-│         Next.js 14 + TypeScript + Tailwind       │
-│  Agent Status | Current Task | Progress | Chat   │
-└────────────────┬────────────────────────────────┘
-                 │ WebSocket
-┌────────────────▼────────────────────────────────┐
-│              Agent Runtime (Backend)             │
-│  Agent Loop | Tools | Memory | Planning | Reasoning│
-└────────────────┬────────────────────────────────┘
-                 │
-        ┌────────┴────────┐
-        │                 │
-        ▼                 ▼
-┌──────────────┐  ┌──────────────┐
-│  Ollama (AI)  │  │ Browser Auto │
-│  Local LLM    │  │ Playwright   │
-└──────────────┘  └──────────────┘
-        │                 │
-        └────────┬────────┘
-                 ▼
-┌────────────────────────────────┐
-│  PostgreSQL | Redis | Storage  │
-└────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                   Mission Control (Frontend)              │
+│            Next.js 14 + TypeScript + Tailwind CSS         │
+│  Dashboard | Agent Chat | Applications | Resumes | Settings│
+└──────────────────────────┬───────────────────────────────┘
+                           │ WebSocket + REST
+┌──────────────────────────▼───────────────────────────────┐
+│                    Agent Runtime (Backend)                │
+│           Spring Boot 3.3 + Clean Architecture            │
+│                                                           │
+│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────┐ │
+│  │ AI Tools     │  │ Browser Auto │  │ Email Monitor   │ │
+│  │ Score        │  │ Playwright   │  │ IMAP/Parsing    │ │
+│  │ Tailor       │  │ Portal Detect│  │ Signal Detect   │ │
+│  │ Cover Letter │  │ Form Fill    │  │ Notifications   │ │
+│  │ Interview    │  │ Stealth      │  │                 │ │
+│  │ ATS Analyze  │  │ Proxy Rotate │  │                 │ │
+│  │ Company Intel│  │ Cookie Store │  │                 │ │
+│  └──────┬──────┘  └──────┬───────┘  └────────┬────────┘ │
+│         │                │                    │           │
+│  ┌──────▼────────────────▼────────────────────▼────────┐ │
+│  │              Domain Layer (DDD)                      │ │
+│  │  Mission | Task | Memory | Job | CandidateProfile    │ │
+│  └──────────────────────────────────────────────────────┘ │
+└──────────────────────────┬───────────────────────────────┘
+                           │
+          ┌────────────────┼────────────────┐
+          ▼                ▼                ▼
+   ┌────────────┐  ┌────────────┐  ┌────────────┐
+   │ PostgreSQL │  │   Redis    │  │   Ollama   │
+   │  Job Data  │  │   Cache    │  │  Local AI  │
+   │  Profiles  │  │   Queue    │  │  Llama 3   │
+   │  Memory    │  │   Sessions │  │            │
+   └────────────┘  └────────────┘  └────────────┘
 ```
 
-## 🛠 Tech Stack
+## Tech Stack
 
 ### Backend
-- **Java 21** with **Spring Boot 3.3.5**
-- **Clean Architecture** (Hexagonal, Domain-Driven Design)
-- **PostgreSQL 16** with pgvector (embeddings)
-- **Redis 7** (task queue, short-term memory, cache)
-- **Ollama** (default local AI provider)
-- **Playwright Java** (browser automation)
-- **JWT** with refresh token rotation
+- **Java 21** + **Spring Boot 3.3** (Clean Architecture / DDD / Hexagonal)
+- **PostgreSQL 16** with Flyway migrations
+- **Redis 7** for caching and task queues
+- **Ollama** (default local AI) with Llama 3 / Nomic Embed
+- **Playwright Java** for browser automation
+- **SpringDoc OpenAPI** for API documentation
+- **Micrometer + Prometheus** for metrics
+- **OpenTelemetry** for distributed tracing
 
 ### Frontend
-- **Next.js 14** (App Router)
-- **TypeScript** with strict mode
-- **Tailwind CSS** for styling
-- **Radix UI** for accessible primitives
+- **Next.js 14** (App Router) + **TypeScript**
+- **Tailwind CSS** + **Radix UI**
 - **React Query** for data fetching
 - **Zustand** for state management
-- **WebSocket** for real-time updates
+- **WebSocket** for real-time agent updates
 
-## 🚀 Quick Start
+### Infrastructure
+- **Docker** multi-stage builds (backend + frontend)
+- **Docker Compose** (dev: full stack, prod: minimal)
+- **GitHub Actions** (CI/CD: build, test, security, release)
+- **Prometheus + Grafana** monitoring dashboards
+- **Loki + Tempo** for logs and traces
+
+## Quick Start
 
 ### Prerequisites
-- **Docker** 24.0+
-- **Docker Compose** 2.20+
-- **Ollama** 0.1.0+ (for local AI)
+- **Java 21** ([OpenJDK](https://openjdk.org/projects/jdk/21/))
+- **Node.js 20+** ([nodejs.org](https://nodejs.org/))
+- **PostgreSQL 16** ([postgresql.org](https://www.postgresql.org/))
+- **Ollama** ([ollama.com](https://ollama.com/)) — for local AI
 
 ### 1. Clone & Setup
+
 ```bash
 git clone https://github.com/manojkushwah91/JobPilotAi.git
 cd JobPilotAi
 ```
 
-### 2. Install Ollama
+### 2. Install Ollama & Pull Model
+
 ```bash
-# Linux
+# Install Ollama (macOS/Linux)
 curl -fsSL https://ollama.com/install.sh | sh
 
-# macOS
-brew install ollama
-
-# Windows
-winget install ollama
+# Pull the AI model
+ollama pull llama3.2
+ollama pull nomic-embed-text
 ```
 
-### 3. Pull AI Model
+### 3. Setup Database
+
 ```bash
-ollama pull llama3
+# Create PostgreSQL database
+psql -U postgres -c "CREATE USER jobpilot WITH PASSWORD 'jobpilot_dev';"
+psql -U postgres -c "CREATE DATABASE jobpilot OWNER jobpilot;"
 ```
 
-### 4. Start Services
+### 4. Start Backend
+
+```bash
+cd backend
+./mvnw spring-boot:run
+# Backend starts at http://localhost:8080
+```
+
+### 5. Start Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+# Frontend starts at http://localhost:3000
+```
+
+### 6. Open Mission Control
+
+Navigate to **http://localhost:3000** and:
+1. Sign up with your email
+2. Upload your resume (auto-parsed)
+3. Fill your profile (skills, experience, preferences)
+4. Create a Mission (target role, salary, location)
+5. Start the Agent — it applies while you supervise
+
+### Docker (All-in-One)
+
 ```bash
 docker compose up -d
+# PostgreSQL + Redis + Backend + Frontend
 ```
 
-This starts:
-- PostgreSQL (with pgvector)
-- Redis
-- Backend API (Spring Boot)
-- Frontend (Next.js)
-
-### 5. Open Browser
-- **Mission Control:** http://localhost:3000
-- **Backend API:** http://localhost:8080/api/v1
-- **Swagger UI:** http://localhost:8080/swagger-ui.html
-
-## 📦 Project Structure
+## Project Structure
 
 ```
 JobPilotAi/
-├── backend/
+├── backend/                          # Spring Boot backend
 │   ├── jobpilot-common/              # Shared utilities
-│   ├── jobpilot-domain/              # Domain entities (Mission, Candidate, Job, Memory, Task, AgentState)
-│   ├── jobpilot-agent-runtime/       # Agent Runtime (CORE - NEW)
-│   │   ├── loop/                    # Agent Loop phases
-│   │   ├── tools/                   # AI tools, Browser tools, Discovery tools, Storage tools
-│   │   ├── memory/                  # Long-term, Short-term, Knowledge, Episode memory
-│   │   ├── planning/                # Planner, Task planner, Workflow engine
-│   │   └── reasoning/               # Reasoner, Decision engine
-│   ├── jobpilot-ai-provider/        # AI Provider Layer (NEW - Ollama-first)
-│   │   ├── ollama/                  # Ollama provider (default)
-│   │   ├── openai/                  # OpenAI provider (optional)
-│   │   ├── gemini/                  # Gemini provider (optional)
-│   │   └── claude/                  # Claude provider (optional)
-│   ├── jobpilot-browser-automation/ # Browser Automation Framework (NEW)
-│   │   ├── BrowserManager.java
-│   │   ├── FormEngine.java
-│   │   ├── UploadEngine.java
-│   │   └── adapters/                # LinkedIn, Indeed, Greenhouse, Lever, Workday
-│   ├── jobpilot-application/        # Application services
-│   │   ├── mission/                 # Mission services (NEW)
-│   │   ├── candidate/               # Candidate profile services (NEW)
-│   │   ├── job/                     # Job services (refactored)
-│   │   ├── application/             # Application services (read-only, refactored)
-│   │   ├── identity/                # Authentication (KEEP)
-│   │   └── notification/            # Notification services (KEEP)
-│   ├── jobpilot-infrastructure/     # Persistence, external integrations
-│   │   ├── persistence/             # JPA repositories
-│   │   └── ai/                     # Ollama adapter (replaces FallbackAiProvider)
-│   ├── jobpilot-interfaces/         # REST controllers, WebSocket handlers
-│   │   ├── mission/                 # Mission endpoints (NEW)
-│   │   ├── agent/                   # Agent control endpoints (NEW)
-│   │   ├── candidate/               # Candidate endpoints (NEW)
-│   │   ├── chat/                    # Chat endpoints (NEW)
-│   │   ├── application/             # Application endpoints (read-only)
-│   │   └── identity/                # Authentication endpoints (KEEP)
-│   └── jobpilot-bootstrap/          # Main application entry point
-├── frontend/
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── mission-control/      # Mission Control (NEW - replaces dashboard)
-│   │   │   │   ├── page.tsx        # Agent supervision interface
-│   │   │   │   ├── chat/           # Chat interface
-│   │   │   │   ├── missions/        # Mission management
-│   │   │   │   └── candidate/       # Candidate profile
-│   │   │   └── applications/        # Application tracking (read-only)
-│   │   ├── components/
-│   │   │   ├── mission-control/     # Agent status, progress, timeline, logs
-│   │   │   ├── chat/                # Chat components
-│   │   │   ├── missions/            # Mission cards, forms, progress
-│   │   │   ├── candidate/           # Profile editor, skills editor
-│   │   │   └── ui/                  # Reusable UI components (KEEP)
-│   │   └── lib/
-│   │       ├── api/                 # API endpoints
-│   │       └── websocket/           # WebSocket client
-├── docker-compose.yml              # Development services
-└── docker-compose.prod.yml         # Production services
+│   ├── jobpilot-domain/              # Domain entities (DDD)
+│   ├── jobpilot-application/         # Application services + AI tools
+│   │   └── agent/tools/              # 10 AI tools (scoring, tailoring, etc.)
+│   ├── jobpilot-infrastructure/      # Adapters (persistence, browser, email)
+│   │   └── automation/               # Playwright, portal detection, stealth
+│   ├── jobpilot-interfaces/          # REST controllers, WebSocket
+│   └── jobpilot-bootstrap/           # Main entry + config
+├── frontend/                         # Next.js 14 frontend
+│   └── src/app/(dashboard)/          # Dashboard, Jobs, Applications, Settings
+├── infrastructure/                   # Docker, monitoring configs
+├── .github/workflows/               # CI/CD (build, test, security, release)
+├── docker-compose.yml               # Production compose
+└── monitoring/                       # Prometheus + Grafana dashboards
 ```
 
-## 🧪 Testing
+## AI Tools
+
+| Tool | Name | Description |
+|------|------|-------------|
+| `DISCOVER_JOBS` | Job Discovery | Searches database for matching jobs |
+| `SCRAPE_JOBS` | Multi-Board Scraper | Scrapes Indeed/LinkedIn with descriptions |
+| `RANK_JOB` | Job Scoring | Scores job match 0-100 with explanations |
+| `TAILOR_RESUME` | Resume Tailoring | Rewrites resume to match job keywords |
+| `GENERATE_COVER_LETTER` | Cover Letter | Generates personalized cover letter |
+| `ANALYZE_RESUME` | ATS Analyzer | Checks ATS compatibility + improvements |
+| `PREPARE_INTERVIEW` | Interview Prep | Generates questions, answers, strategy |
+| `RESEARCH_COMPANY` | Company Intel | Researches company culture, finances, news |
+| `SUBMIT_APPLICATION` | Auto-Apply | Fills forms via browser automation |
+| `MONITOR_EMAILS` | Email Monitor | Detects interviews, rejections, offers |
+
+## API Documentation
+
+Once the backend is running, access Swagger UI at:
+- **http://localhost:8080/swagger-ui.html**
+
+## Monitoring
 
 ```bash
-# Backend
-cd backend && mvn test
+# Start monitoring stack
+cd monitoring
+docker compose -f docker-compose.monitoring.yml up -d
 
-# Frontend unit tests
-cd frontend && npm test
-
-# E2E tests
-cd frontend && npm run e2e
+# Grafana: http://localhost:3001 (admin/admin)
+# Prometheus: http://localhost:9090
 ```
 
-## 📖 Documentation
+## Testing
 
-- [SRS v2.0](SRS_V2.md) - Software Requirements Specification
-- [HLD v2.0](HLD_V2.md) - High Level Design
-- [LLD v2.0](LLD_V2.md) - Low Level Design
-- [C4 Architecture v2.0](C4_ARCHITECTURE_V2.md) - C4 Architecture Diagrams
-- [Database Design v2.0](DATABASE_DESIGN_V2.md) - Database Schema
-- [Security v2.0](SECURITY_V2.md) - Security Documentation
-- [Testing Strategy v2.0](TESTING_STRATEGY_V2.md) - Testing Strategy
-- [Deployment v2.0](DEPLOYMENT_V2.md) - Deployment Guide
+```bash
+# Backend (332+ tests)
+cd backend
+mvn test
 
-## 🎯 First Complete Journey
+# Frontend
+cd frontend
+npm test
+```
 
-After approval, the first implementation will be:
+## Documentation
 
-1. **Upload Resume** → Parse Resume → Extract Profile
-2. **Create Mission** → Set preferences (salary, locations, companies)
-3. **Start Agent** → Agent searches jobs → Analyzes jobs → Ranks jobs
-4. **Tailor Resume** → Generate Cover Letter → Launch Browser
-5. **Fill Application** → Upload Resume → Pause if CAPTCHA
-6. **User Approves** → Submit → Take Screenshot → Store Application
-7. **Notify User** → Update Mission → Repeat
+| Document | Description |
+|----------|-------------|
+| [C4 Architecture](C4_ARCHITECTURE.md) | System architecture diagrams (Levels 1-4) |
+| [High-Level Design](HLD.md) | System design overview |
+| [Low-Level Design](LLD.md) | Detailed component design |
+| [Database Design](DATABASE_DESIGN.md) | PostgreSQL schema |
+| [Security](SECURITY.md) | Authentication, authorization, encryption |
+| [Browser Automation](BROWSER_AUTOMATION.md) | Playwright automation architecture |
+| [AI Provider Layer](AI_PROVIDER_LAYER.md) | Ollama + cloud AI integration |
+| [Logging & Observability](LOGGING_OBSERVABILITY.md) | Monitoring stack |
 
-## 🔒 Privacy & Security
+## How It Works
 
-- **Offline-First:** Default AI inference is local (Ollama)
-- **Data Encryption:** All user data encrypted at rest (AES-256)
-- **No Cloud AI by Default:** Cloud AI providers are opt-in only
-- **Open Source:** Fully open-source, transparent codebase
+```
+1. SCRAPE    → Playwright scrapes Indeed/LinkedIn for jobs with descriptions
+2. DISCOVER  → Query database for jobs matching your criteria
+3. SCORE     → AI scores each job 0-100 (skills, experience, salary fit)
+4. TAILOR    → AI rewrites your resume to match the job description
+5. COVER     → AI writes a personalized cover letter
+6. APPLY     → Browser opens job page, detects portal, fills form
+7. MONITOR   → Scans email for interview invites, rejections, offers
+8. LEARN     → Agent remembers what worked and improves over time
+```
 
-## 🤝 Contributing
+## Privacy
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Offline-First:** AI runs locally via Ollama — no data sent to cloud
+- **Data Stays Local:** All profiles, resumes, and history on your machine
+- **Cloud AI is Opt-In:** OpenAI/Gemini/Claude available but disabled by default
+- **Open Source:** Full codebase on GitHub — verify everything
 
-## 📄 License
+## License
 
-MIT — see [LICENSE](LICENSE).
-
-## 🙏 Acknowledgments
-
-- **Ollama** - Local LLM inference engine
-- **Playwright** - Browser automation framework
-- **Spring Boot** - Java application framework
-- **Next.js** - React framework
-- **PostgreSQL** - Relational database
-- **Redis** - In-memory data store
+MIT — see [LICENSE](LICENSE)
 
 ---
 
-**JobPilot AI v2.0 — The world's best open-source offline-first autonomous AI job agent.**
+**JobPilot AI — The AI applies. You supervise.**
