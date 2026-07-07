@@ -4,8 +4,10 @@ import com.jobpilot.application.agent.ports.BrowserAutomationPort;
 import com.jobpilot.infrastructure.automation.BrowserAutomationFramework;
 import com.jobpilot.infrastructure.automation.PlaywrightBrowserManager;
 import com.jobpilot.infrastructure.automation.PlaywrightDomAnalyzer;
+import com.jobpilot.infrastructure.automation.persistence.CookiePersistenceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -19,6 +21,8 @@ public class BrowserAutomationPortAdapter implements BrowserAutomationPort {
     private final BrowserAutomationFramework framework;
     private final PlaywrightBrowserManager browserManager;
     private final PlaywrightDomAnalyzer domAnalyzer;
+    @Autowired(required = false)
+    private CookiePersistenceManager cookiePersistenceManager;
 
     public BrowserAutomationPortAdapter(BrowserAutomationFramework framework,
                                          PlaywrightBrowserManager browserManager,
@@ -100,6 +104,22 @@ public class BrowserAutomationPortAdapter implements BrowserAutomationPort {
     public void closeBrowser() {
         log.info("Closing browser via port adapter");
         framework.cleanup();
+    }
+
+    @Override
+    public void saveCookiesForPortal(String portal) {
+        if (cookiePersistenceManager != null) {
+            cookiePersistenceManager.saveCookies(browserManager, portal);
+            log.info("Saved cookies for portal: {}", portal);
+        }
+    }
+
+    @Override
+    public void loadCookiesForPortal(String portal) {
+        if (cookiePersistenceManager != null && cookiePersistenceManager.hasCookies(portal)) {
+            cookiePersistenceManager.loadCookies(browserManager, portal);
+            log.info("Loaded cookies for portal: {}", portal);
+        }
     }
 
     @Override

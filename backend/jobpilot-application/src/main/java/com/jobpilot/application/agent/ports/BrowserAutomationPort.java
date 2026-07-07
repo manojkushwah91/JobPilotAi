@@ -24,6 +24,10 @@ public interface BrowserAutomationPort {
 
     Map<String, Object> getApplicationFormFields(String url);
 
+    default void saveCookiesForPortal(String portal) {}
+
+    default void loadCookiesForPortal(String portal) {}
+
     default boolean isAvailable() {
         return true;
     }

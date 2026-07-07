@@ -96,6 +96,10 @@ public class ApplicationSubmissionTool implements Tool {
                 portalType = portalDetector.detectPortal(currentUrl);
             }
 
+            if (!"unknown".equals(portalType)) {
+                browserAutomation.loadCookiesForPortal(portalType);
+            }
+
             if ("unknown".equals(portalType)) {
                 var applyUrl = findAndClickApplyButton();
                 if (applyUrl != null) {
@@ -200,6 +204,11 @@ public class ApplicationSubmissionTool implements Tool {
             result.put("portalType", portalType);
             result.put("message", String.format("Found %d fields, filled %d with profile data. Awaiting approval.",
                 fields.size(), filledCount));
+
+            if (!"unknown".equals(portalType)) {
+                browserAutomation.saveCookiesForPortal(portalType);
+            }
+
             return result;
 
         } catch (Exception e) {
