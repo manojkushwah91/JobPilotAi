@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { agentPost, API } from '@/lib/api/agent-client';
+import { useWebSocket } from '@/lib/hooks/useWebSocket';
 import {
   Send,
   Bot,
@@ -19,6 +20,8 @@ import {
   FileText,
   Search,
   TrendingUp,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 
 interface Message {
@@ -35,6 +38,22 @@ export default function AgentChat() {
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const { connected } = useWebSocket({
+    url: `ws://localhost:8080/ws/automation`,
+    topics: ['agent-status', 'mission-update'],
+    onMessage: (msg) => {
+      if (msg.type === 'agent-status' || msg.type === 'mission-update') {
+        const agentMessage: Message = {
+          id: `ws-${Date.now()}`,
+          role: 'agent',
+          content: typeof msg.data.message === 'string' ? msg.data.message : JSON.stringify(msg.data),
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, agentMessage]);
+      }
+    },
+  });
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -108,6 +127,18 @@ export default function AgentChat() {
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {connected ? (
+            <>
+              <Wifi className="h-3.5 w-3.5 text-success animate-pulse" />
+              <span className="text-success">Live</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>Offline</span>
+            </>
+          )}
+          <span className="text-border">|</span>
           <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
           <span>Powered by Ollama</span>
         </div>
