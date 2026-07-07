@@ -55,15 +55,28 @@ public class ApplicationSubmissionTool implements Tool {
         var profileData = new LinkedHashMap<String, Object>();
         if (userId != null) {
             profileRepository.findByUserId(userId).ifPresent(profile -> {
-                profileData.put("fullName", profile.fullName());
-                profileData.put("email", profile.email());
-                profileData.put("phone", profile.phone());
-                profileData.put("location", profile.location());
+                profileData.put("fullName", profile.fullName() != null ? profile.fullName() : "");
+                profileData.put("email", profile.email() != null ? profile.email() : "");
+                profileData.put("phone", profile.phone() != null ? profile.phone() : "");
+                profileData.put("location", profile.location() != null ? profile.location() : "");
+                profileData.put("headline", profile.headline() != null ? profile.headline() : "");
+                profileData.put("summary", profile.summary() != null ? profile.summary() : "");
                 profileData.put("skills", profile.skills());
-                profileData.put("resumeText", profile.resumeText());
-                profileData.put("resumeFileUrl", profile.resumeFileUrl());
-                profileData.put("linkedinUrl", profile.linkedinUrl());
-                profileData.put("portfolioUrl", profile.portfolioUrl());
+                profileData.put("experience", profile.experience());
+                profileData.put("education", profile.education());
+                profileData.put("certifications", profile.certifications());
+                profileData.put("resumeText", profile.resumeText() != null ? profile.resumeText() : "");
+                profileData.put("resumeFileUrl", profile.resumeFileUrl() != null ? profile.resumeFileUrl() : "");
+                profileData.put("linkedinUrl", profile.linkedinUrl() != null ? profile.linkedinUrl() : "");
+                profileData.put("portfolioUrl", profile.portfolioUrl() != null ? profile.portfolioUrl() : "");
+                profileData.put("yearsExperience", profile.yearsExperience() != null ? String.valueOf(profile.yearsExperience()) : "");
+                profileData.put("desiredRole", profile.desiredRole() != null ? profile.desiredRole() : "");
+                profileData.put("desiredLocation", profile.desiredLocation() != null ? profile.desiredLocation() : "");
+                profileData.put("salaryExpectationMin", profile.salaryExpectationMin() != null ? String.valueOf(profile.salaryExpectationMin()) : "");
+                profileData.put("salaryExpectationMax", profile.salaryExpectationMax() != null ? String.valueOf(profile.salaryExpectationMax()) : "");
+                profileData.put("currency", profile.currency() != null ? profile.currency() : "");
+                profileData.put("employmentType", profile.employmentType() != null ? profile.employmentType() : "");
+                profileData.put("workPreference", profile.workPreference() != null ? profile.workPreference() : "");
             });
         }
 
@@ -94,10 +107,10 @@ public class ApplicationSubmissionTool implements Tool {
                 var matchResult = matchFieldToProfile(label, name, fieldType, profileData);
                 if (matchResult != null) {
                     try {
-                        browserAutomation.fillField(selector, matchResult);
+                        fillFieldByType(selector, fieldType, matchResult);
                         filledCount++;
                         filledFields.add(label.isEmpty() ? name : label);
-                        log.info("Filled field '{}' with profile data", label.isEmpty() ? name : label);
+                        log.info("Filled field '{}' ({}) with profile data", label.isEmpty() ? name : label, fieldType);
                     } catch (Exception e) {
                         log.warn("Failed to fill field {}: {}", selector, e.getMessage());
                         skippedFields.add(label.isEmpty() ? name : label);
@@ -142,8 +155,27 @@ public class ApplicationSubmissionTool implements Tool {
         }
     }
 
+    private void fillFieldByType(String selector, String type, String value) {
+        switch (type.toLowerCase()) {
+            case "checkbox" -> {
+                if ("true".equalsIgnoreCase(value) || "yes".equalsIgnoreCase(value)) {
+                    browserAutomation.clickElement(selector);
+                }
+            }
+            case "radio" -> browserAutomation.clickElement(selector);
+            case "select" -> browserAutomation.fillField(selector, value);
+            case "file" -> {
+                if (value != null && !value.isBlank()) {
+                    browserAutomation.fillField(selector, value);
+                }
+            }
+            default -> browserAutomation.fillField(selector, value);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
     private String matchFieldToProfile(String label, String name, String type, Map<String, Object> profile) {
-        var fieldText = (label + " " + name).toLowerCase();
+        var fieldText = (label + " " + name).toLowerCase().trim();
 
         if (profile.isEmpty()) return null;
 
@@ -161,29 +193,88 @@ public class ApplicationSubmissionTool implements Tool {
                 return parts.length > 1 ? parts[1] : "";
             }
         }
-        if (fieldText.contains("full") && fieldText.contains("name") || fieldText.equals("name")) {
+        if (fieldText.contains("full") && fieldText.contains("name") || fieldText.equals("name") || fieldText.equals("your name")) {
             return (String) profile.get("fullName");
         }
-        if (fieldText.contains("email")) {
+        if (fieldText.contains("email") || fieldText.contains("e-mail")) {
             return (String) profile.get("email");
         }
-        if (fieldText.contains("phone") || fieldText.contains("tel")) {
+        if (fieldText.contains("phone") || fieldText.contains("tel") || fieldText.contains("mobile") || fieldText.contains("number")) {
             return (String) profile.get("phone");
         }
-        if (fieldText.contains("location") || fieldText.contains("city") || fieldText.contains("address")) {
+        if (fieldText.contains("location") || fieldText.contains("city") || fieldText.contains("address") || fieldText.contains("state") || fieldText.contains("country")) {
             return (String) profile.get("location");
         }
         if (fieldText.contains("linkedin")) {
             return (String) profile.get("linkedinUrl");
         }
-        if (fieldText.contains("portfolio") || fieldText.contains("website") || fieldText.contains("github")) {
+        if (fieldText.contains("portfolio") || fieldText.contains("website") || fieldText.contains("github") || fieldText.contains("personal url")) {
             return (String) profile.get("portfolioUrl");
         }
-        if (fieldText.contains("summary") || fieldText.contains("about") || fieldText.contains("bio")) {
-            return (String) profile.get("summary");
+        if (fieldText.contains("summary") || fieldText.contains("about") || fieldText.contains("bio") || fieldText.contains("objective")) {
+            var summary = (String) profile.get("summary");
+            if (summary != null && !summary.isBlank()) return summary;
+            var resumeText = (String) profile.get("resumeText");
+            if (resumeText != null && !resumeText.isBlank()) {
+                return resumeText.length() > 500 ? resumeText.substring(0, 500) : resumeText;
+            }
+            return null;
+        }
+        if (fieldText.contains("headline") || fieldText.contains("title") || fieldText.contains("current role")) {
+            return (String) profile.get("headline");
+        }
+        if (fieldText.contains("year") && fieldText.contains("experience")) {
+            return (String) profile.get("yearsExperience");
+        }
+        if (fieldText.contains("desired") && fieldText.contains("role")) {
+            return (String) profile.get("desiredRole");
+        }
+        if (fieldText.contains("desired") && fieldText.contains("location")) {
+            return (String) profile.get("desiredLocation");
+        }
+        if (fieldText.contains("salary") || fieldText.contains("compensation") || fieldText.contains("expected pay")) {
+            var min = (String) profile.get("salaryExpectationMin");
+            var max = (String) profile.get("salaryExpectationMax");
+            if (min != null && max != null) return min + " - " + max;
+            if (min != null) return min;
+            return null;
+        }
+        if (fieldText.contains("employment") && fieldText.contains("type") || fieldText.contains("work type")) {
+            return (String) profile.get("employmentType");
+        }
+        if (fieldText.contains("work preference") || fieldText.contains("remote") || fieldText.contains("work style")) {
+            return (String) profile.get("workPreference");
+        }
+        if (fieldText.contains("skill") || fieldText.contains("technology") || fieldText.contains("tech")) {
+            var skills = profile.get("skills");
+            if (skills instanceof List<?> skillList && !skillList.isEmpty()) {
+                return String.join(", ", skillList.stream().map(Object::toString).toList());
+            }
+            return null;
+        }
+        if (fieldText.contains("experience") && !fieldText.contains("year")) {
+            var experience = profile.get("experience");
+            if (experience instanceof List<?> expList && !expList.isEmpty()) {
+                return expList.get(0).toString();
+            }
+            return null;
+        }
+        if (fieldText.contains("education") || fieldText.contains("degree") || fieldText.contains("university")) {
+            var education = profile.get("education");
+            if (education instanceof List<?> eduList && !eduList.isEmpty()) {
+                return eduList.get(0).toString();
+            }
+            return null;
+        }
+        if (fieldText.contains("certification") || fieldText.contains("license")) {
+            var certs = profile.get("certifications");
+            if (certs instanceof List<?> certList && !certList.isEmpty()) {
+                return String.join(", ", certList.stream().map(Object::toString).toList());
+            }
+            return null;
         }
 
-        if ("file".equals(type) && fieldText.contains("resume")) {
+        if ("file".equals(type) && (fieldText.contains("resume") || fieldText.contains("cv"))) {
             var fileUrl = (String) profile.get("resumeFileUrl");
             if (fileUrl != null && !fileUrl.isBlank()) {
                 return fileUrl;
