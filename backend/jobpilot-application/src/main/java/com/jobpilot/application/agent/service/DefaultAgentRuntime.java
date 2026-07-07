@@ -95,6 +95,7 @@ public class DefaultAgentRuntime implements AgentRuntime {
             var plan = plan(mission, decision);
             execute(mission, plan);
         }
+        checkEmails(mission);
         verify(mission);
         learn(mission);
     }
@@ -490,6 +491,33 @@ public class DefaultAgentRuntime implements AgentRuntime {
         } catch (Exception e) {
             log.warn("Cover letter generation failed for {} at {}: {}", jobTitle, company, e.getMessage());
             return null;
+        }
+    }
+
+    private void checkEmails(Mission mission) {
+        try {
+            var tool = toolRegistry.findByName("MONITOR_EMAILS");
+            if (tool.isEmpty()) return;
+
+            var missionTasks = taskService.getMissionTasks(mission.missionId().value());
+            var hasEmailTask = missionTasks.stream()
+                .anyMatch(t -> t.taskType() == TaskType.SEND_NOTIFICATION
+                    && t.status() == TaskStatus.COMPLETED);
+
+            var completedApps = missionTasks.stream()
+                .filter(t -> t.taskType() == TaskType.SUBMIT_APPLICATION
+                    && t.status() == TaskStatus.COMPLETED)
+                .count();
+
+            if (completedApps > 0) {
+                var input = new LinkedHashMap<String, Object>();
+                input.put("userId", mission.userId());
+                input.put("maxEmails", 20);
+                var result = tool.get().execute(input);
+                log.info("Email check: {}", result.getOrDefault("signalsFound", 0));
+            }
+        } catch (Exception e) {
+            log.debug("Email check skipped: {}", e.getMessage());
         }
     }
 }

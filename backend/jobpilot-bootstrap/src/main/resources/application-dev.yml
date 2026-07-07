@@ -145,3 +145,10 @@ jobpilot:
     max-tabs: 3
   cookies:
     dir: ./cookies
+  email:
+    imap:
+      host: ${JOBPILOT_EMAIL_IMAP_HOST:}
+      port: ${JOBPILOT_EMAIL_IMAP_PORT:993}
+      username: ${JOBPILOT_EMAIL_IMAP_USERNAME:}
+      password: ${JOBPILOT_EMAIL_IMAP_PASSWORD:}
+      folder: INBOX
