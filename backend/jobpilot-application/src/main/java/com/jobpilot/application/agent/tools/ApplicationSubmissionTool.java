@@ -84,6 +84,19 @@ public class ApplicationSubmissionTool implements Tool {
             });
         }
 
+        var tailoredResume = (String) input.get("tailoredResume");
+        if (tailoredResume != null && !tailoredResume.isBlank()) {
+            profileData.put("summary", tailoredResume);
+            profileData.put("resumeText", tailoredResume);
+            log.info("Using AI-tailored resume for application");
+        }
+
+        var coverLetter = (String) input.get("coverLetter");
+        if (coverLetter != null && !coverLetter.isBlank()) {
+            profileData.put("coverLetter", coverLetter);
+            log.info("Using AI-generated cover letter for application");
+        }
+
         try {
             browserAutomation.launchBrowser();
             browserAutomation.navigateTo(url);
@@ -389,6 +402,11 @@ public class ApplicationSubmissionTool implements Tool {
             if (resumeText != null && !resumeText.isBlank()) {
                 return resumeText.length() > 500 ? resumeText.substring(0, 500) : resumeText;
             }
+            return null;
+        }
+        if (fieldText.contains("cover") && fieldText.contains("letter") || fieldText.contains("coverletter")) {
+            var cl = (String) profile.get("coverLetter");
+            if (cl != null && !cl.isBlank()) return cl;
             return null;
         }
         if (fieldText.contains("headline") || fieldText.contains("title") || fieldText.contains("current role")) {
