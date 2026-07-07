@@ -120,6 +120,20 @@ public class ApplicationSubmissionTool implements Tool {
             log.info("Page type: {}, Portal: {}, Fields found: {}, Has CAPTCHA: {}",
                 pageType, portalType, fields.size(), hasCaptcha);
 
+            if (hasCaptcha) {
+                var screenshot = browserAutomation.takeScreenshot();
+                var result = new LinkedHashMap<String, Object>();
+                result.put("status", "captcha_required");
+                result.put("url", url);
+                result.put("jobTitle", jobTitle);
+                result.put("company", company);
+                result.put("portalType", portalType);
+                result.put("screenshot", screenshot != null && screenshot.length > 0 ? "captured" : "failed");
+                result.put("message", "CAPTCHA detected. Manual intervention required.");
+                log.warn("CAPTCHA detected on {}, pausing for manual resolution", url);
+                return result;
+            }
+
             int filledCount = 0;
             var filledFields = new ArrayList<String>();
             var skippedFields = new ArrayList<String>();

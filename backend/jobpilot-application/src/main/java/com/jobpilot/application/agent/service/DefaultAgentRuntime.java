@@ -239,6 +239,16 @@ public class DefaultAgentRuntime implements AgentRuntime {
                     }
 
                     var result = tool.get().execute(enrichedInput);
+
+                    if (task.taskType() == TaskType.SUBMIT_APPLICATION
+                            && "captcha_required".equals(result.get("status"))) {
+                        notificationPort.notifyUser(mission.userId(),
+                            "CAPTCHA Detected",
+                            "CAPTCHA detected on " + result.getOrDefault("url", "unknown job")
+                                + ". Manual intervention required.",
+                            "agent");
+                    }
+
                     taskService.completeTask(task.taskId().value(), result);
                     log.info("Task {} completed with result: {}", task.taskId(), result);
                 } else {
