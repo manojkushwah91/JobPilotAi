@@ -40,7 +40,7 @@
         <springdoc.version>2.6.0</springdoc.version>
 
         <!-- Database -->
-        <flyway.version>10.20.0</flyway.version>
+        <flyway.version>12.11.0</flyway.version>
         <pgvector.version>0.1.5</pgvector.version>
 
         <!-- Observability -->
