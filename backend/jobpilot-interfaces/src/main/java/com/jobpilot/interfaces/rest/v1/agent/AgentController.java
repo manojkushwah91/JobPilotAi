@@ -3,6 +3,7 @@ package com.jobpilot.interfaces.rest.v1.agent;
 import com.jobpilot.domain.agent.AgentRuntime;
 import com.jobpilot.application.agent.service.AgentChatService;
 import com.jobpilot.application.agent.service.AgentTaskService;
+import com.jobpilot.application.agent.service.CareerAgentBrain;
 import com.jobpilot.application.agent.service.MissionService;
 import com.jobpilot.domain.agent.MissionStatus;
 import com.jobpilot.infrastructure.automation.BrowserAutomationService;
@@ -30,6 +31,7 @@ public class AgentController {
     private final AgentTaskService taskService;
     private final AgentChatService chatService;
     private final AgentRuntime agentRuntime;
+    private final CareerAgentBrain careerAgentBrain;
     private final BrowserAutomationService automationService;
     private final AutomationProgressTracker progressTracker;
     private final ApplicationQueue applicationQueue;
@@ -41,6 +43,7 @@ public class AgentController {
                            AgentTaskService taskService,
                            AgentChatService chatService,
                            AgentRuntime agentRuntime,
+                           CareerAgentBrain careerAgentBrain,
                            BrowserAutomationService automationService,
                            AutomationProgressTracker progressTracker,
                            ApplicationQueue applicationQueue,
@@ -51,6 +54,7 @@ public class AgentController {
         this.taskService = taskService;
         this.chatService = chatService;
         this.agentRuntime = agentRuntime;
+        this.careerAgentBrain = careerAgentBrain;
         this.automationService = automationService;
         this.progressTracker = progressTracker;
         this.applicationQueue = applicationQueue;
@@ -89,6 +93,27 @@ public class AgentController {
     public ResponseEntity<?> getUserMissions(@PathVariable UUID userId) {
         var missions = missionService.getUserMissions(userId);
         return ResponseEntity.ok(missions.stream().map(MissionResponse::from).toList());
+    }
+
+    @GetMapping("/missions/{missionId}/status")
+    public ResponseEntity<Map<String, Object>> getMissionStatus(@PathVariable UUID missionId) {
+        var status = agentRuntime.getMissionStatus(missionId);
+        return ResponseEntity.ok(status);
+    }
+
+    @GetMapping("/briefing")
+    public ResponseEntity<Map<String, Object>> getBriefing(@RequestParam UUID userId) {
+        var briefing = careerAgentBrain.generateBriefing(userId);
+        var state = careerAgentBrain.getOrCreateState(userId);
+        var review = careerAgentBrain.weeklyReview(userId);
+        return ResponseEntity.ok(Map.of(
+            "briefing", briefing,
+            "totalApplications", state.totalApplicationsSubmitted(),
+            "totalInterviews", state.totalInterviewsScheduled(),
+            "consecutiveFailures", state.consecutiveFailures(),
+            "currentPlan", state.currentPlan().toPromptContext(),
+            "latestWeeklyReview", review.map(r -> r.toBriefing()).orElse("")
+        ));
     }
 
     @PostMapping("/missions/{missionId}/start")

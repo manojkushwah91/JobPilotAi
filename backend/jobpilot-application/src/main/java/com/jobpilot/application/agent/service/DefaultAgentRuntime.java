@@ -22,8 +22,8 @@ public class DefaultAgentRuntime implements AgentRuntime {
     private final ObservationRepository observationRepository;
     private final DecisionRepository decisionRepository;
     private final ToolRegistry toolRegistry;
-    private final AiProviderPort aiProvider;
     private final NotificationPort notificationPort;
+    private final CareerAgentBrain brain;
 
     private final Map<UUID, Boolean> runningMissions = new ConcurrentHashMap<>();
     private volatile boolean agentRunning = false;
@@ -34,16 +34,16 @@ public class DefaultAgentRuntime implements AgentRuntime {
                                 ObservationRepository observationRepository,
                                 DecisionRepository decisionRepository,
                                 ToolRegistry toolRegistry,
-                                AiProviderPort aiProvider,
-                                NotificationPort notificationPort) {
+                                NotificationPort notificationPort,
+                                CareerAgentBrain brain) {
         this.missionService = missionService;
         this.taskService = taskService;
         this.memoryService = memoryService;
         this.observationRepository = observationRepository;
         this.decisionRepository = decisionRepository;
         this.toolRegistry = toolRegistry;
-        this.aiProvider = aiProvider;
         this.notificationPort = notificationPort;
+        this.brain = brain;
     }
 
     @Override
@@ -56,6 +56,7 @@ public class DefaultAgentRuntime implements AgentRuntime {
         try {
             var mission = missionService.getMission(missionId);
             missionService.startMission(missionId);
+            var cycleCount = 0;
 
             while (runningMissions.getOrDefault(missionId, false)) {
                 mission = missionService.getMission(missionId);
@@ -66,6 +67,11 @@ public class DefaultAgentRuntime implements AgentRuntime {
                 }
 
                 executeAgentLoop(mission);
+
+                cycleCount++;
+                if (cycleCount % 100 == 0) {
+                    log.info("Mission {} completed {} cycles", missionId, cycleCount);
+                }
 
                 Thread.sleep(5000);
             }
@@ -88,16 +94,38 @@ public class DefaultAgentRuntime implements AgentRuntime {
     }
 
     private void executeAgentLoop(Mission mission) throws Exception {
+        var userId = mission.userId();
+
+        // Layer 1+2: Load identity + memory (handled by brain internally)
+        brain.getOrCreateState(userId);
+
+        // Observe current state
         observe(mission);
+
+        // Layer 3: Think (LLM-based reasoning)
         var observations = observationRepository.findByMissionId(mission.missionId().value());
-        var decision = reason(mission, observations);
-        if (decision != null) {
-            var plan = plan(mission, decision);
+        var thinking = brain.think(userId, mission, observations);
+
+        if (thinking.shouldAct()) {
+            // Layer 4: Plan
+            var plan = brain.plan(userId, mission, thinking);
+            log.info("Plan: {} ({} actions)", plan.strategyNarrative(), plan.actions().size());
+
+            // Layer 5: Execute (reflection happens per-task inside execute)
             execute(mission, plan);
         }
+
         checkEmails(mission);
         verify(mission);
-        learn(mission);
+
+        var review = brain.weeklyReview(userId);
+        review.ifPresent(r -> {
+            log.info("Weekly review: {} insights", r.insights().size());
+            notificationPort.notifyUser(userId,
+                "Weekly Career Review",
+                "I've completed my weekly self-evaluation. " + r.insights().size() + " insights found.",
+                "agent");
+        });
     }
 
     private void observe(Mission mission) {
@@ -111,159 +139,29 @@ public class DefaultAgentRuntime implements AgentRuntime {
         observationRepository.save(observation);
     }
 
-    @SuppressWarnings("unchecked")
-    private AgentDecision reason(Mission mission, List<AgentObservation> observations) {
-        log.debug("Reasoning for mission {}", mission.missionId());
-
-        var pendingTasks = taskService.getPendingTasks();
-        if (!pendingTasks.isEmpty()) {
-            return AgentDecision.create(
-                mission.missionId().value(),
-                DecisionType.APPLY_TO_JOB,
-                "Pending tasks available for execution"
-            );
-        }
-
-        var missionTasks = taskService.getMissionTasks(mission.missionId().value());
-
-        var hasRunningApplyTasks = missionTasks.stream()
-            .anyMatch(t -> t.taskType() == TaskType.SUBMIT_APPLICATION
-                && (t.status() == TaskStatus.RUNNING || t.status() == TaskStatus.PENDING));
-
-        if (hasRunningApplyTasks) {
-            log.debug("Mission {} has running apply tasks, skipping discovery", mission.missionId());
-            return null;
-        }
-
-        var unprocessedDiscoveries = missionTasks.stream()
-            .filter(t -> t.taskType() == TaskType.DISCOVER_JOBS
-                && t.status() == TaskStatus.COMPLETED
-                && t.output() != null
-                && !t.output().containsKey("processed"))
-            .toList();
-
-        if (!unprocessedDiscoveries.isEmpty()) {
-            for (var discoveryTask : unprocessedDiscoveries) {
-                var jobsFound = discoveryTask.output().get("jobsFound");
-                if (jobsFound instanceof List<?> jobs && !jobs.isEmpty()) {
-                    log.info("Processing {} discovered jobs from task {}", jobs.size(), discoveryTask.taskId());
-
-                    int remaining = (int) mission.dailyApplicationLimit() -
-                        mission.totalApplicationsSubmitted();
-
-                    for (int i = 0; i < Math.min(jobs.size(), remaining); i++) {
-                        var job = (Map<String, Object>) jobs.get(i);
-                        var jobUrl = (String) job.getOrDefault("url", "");
-                        var jobTitle = (String) job.getOrDefault("title", "Unknown");
-                        var company = (String) job.getOrDefault("company", "Unknown");
-                        var description = (String) job.getOrDefault("description", "");
-
-                        if (jobUrl.isBlank()) continue;
-
-                        var scoreResult = scoreJob(mission, jobTitle, company, description);
-                        var score = scoreResult != null ? ((Number) scoreResult.getOrDefault("score", 0)).intValue() : 50;
-                        var recommendation = scoreResult != null ? (String) scoreResult.getOrDefault("recommendation", "maybe") : "maybe";
-
-                        log.info("Job score: {} at {} = {}/100 ({})", jobTitle, company, score, recommendation);
-
-                        if (score < 50 && "skip".equals(recommendation)) {
-                            log.info("Skipping low-score job: {} at {} (score: {})", jobTitle, company, score);
-                            continue;
-                        }
-
-                        var input = new LinkedHashMap<String, Object>();
-                        input.put("url", jobUrl);
-                        input.put("title", jobTitle);
-                        input.put("company", company);
-                        input.put("jobId", job.get("id"));
-                        input.put("description", description);
-                        input.put("matchScore", score);
-                        input.put("matchRecommendation", recommendation);
-
-                        if (score >= 60) {
-                            var tailored = tailorResume(mission, jobTitle, company, description);
-                            if (tailored != null && "success".equals(tailored.get("status"))) {
-                                input.put("tailoredResume", tailored.get("tailoredResume"));
-                            }
-
-                            var coverLetter = generateCoverLetter(mission, jobTitle, company, description);
-                            if (coverLetter != null && "success".equals(coverLetter.get("status"))) {
-                                input.put("coverLetter", coverLetter.get("coverLetter"));
-                            }
-                        }
-
-                        taskService.createTaskWithInput(
-                            mission.missionId().value(),
-                            mission.userId(),
-                            TaskType.SUBMIT_APPLICATION,
-                            "Apply to: " + jobTitle + " at " + company,
-                            5,
-                            input
-                        );
-                        log.info("Created SUBMIT_APPLICATION task for {} at {} (score: {})", jobTitle, company, score);
-                    }
-
-                    discoveryTask.output().put("processed", true);
-                }
-            }
-
-            return AgentDecision.create(
-                mission.missionId().value(),
-                DecisionType.APPLY_TO_JOB,
-                "Created apply tasks from discovered jobs"
-            );
-        }
-
-        if (!mission.hasReachedDailyLimit()) {
-            var hasRecentDiscovery = missionTasks.stream()
-                .anyMatch(t -> t.taskType() == TaskType.DISCOVER_JOBS
-                    && t.status() == TaskStatus.COMPLETED);
-
-            if (!hasRecentDiscovery) {
-                var totalJobsInDb = missionTasks.stream()
-                    .filter(t -> t.taskType() == TaskType.DISCOVER_JOBS && t.status() == TaskStatus.COMPLETED)
-                    .count();
-
-                if (totalJobsInDb == 0) {
-                    for (var board : List.of("indeed", "linkedin")) {
-                        taskService.createTaskWithInput(
-                            mission.missionId().value(),
-                            mission.userId(),
-                            TaskType.DISCOVER_JOBS,
-                            "Scrape jobs from " + board,
-                            10,
-                            Map.of("board", board, "query", mission.targetRole(),
-                                "location", mission.targetLocation() != null ? mission.targetLocation() : "")
-                        );
-                    }
-                    log.info("Created SCRAPE_JOBS tasks for indeed + linkedin");
-                } else {
-                    taskService.createTaskWithPriority(
-                        mission.missionId().value(),
-                        mission.userId(),
-                        TaskType.DISCOVER_JOBS,
-                        "Discover new jobs matching mission criteria",
-                        10
-                    );
-                    log.info("Created DISCOVER_JOBS task for mission {}", mission.missionId());
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private Map<String, Object> plan(Mission mission, AgentDecision decision) {
-        log.debug("Planning for mission {}", mission.missionId());
-        var plan = new HashMap<String, Object>();
-        plan.put("missionId", mission.missionId().value());
-        plan.put("decisionType", decision.type().name());
-        plan.put("timestamp", Instant.now().toString());
-        return plan;
-    }
-
-    private void execute(Mission mission, Map<String, Object> plan) {
+    private void execute(Mission mission, AgentPlan plan) {
         log.debug("Executing plan for mission {}", mission.missionId());
+
+        if (!plan.pendingActions().isEmpty()) {
+            var missionTasks = taskService.getMissionTasks(mission.missionId().value());
+
+            for (var action : plan.pendingActions()) {
+                var taskType = inferTaskType(action.actionType());
+                var alreadyPending = missionTasks.stream()
+                    .anyMatch(t -> t.taskType() == taskType && t.status() == TaskStatus.PENDING);
+                if (alreadyPending) continue;
+
+                taskService.createTaskWithInput(
+                    mission.missionId().value(),
+                    mission.userId(),
+                    taskType,
+                    action.description(),
+                    action.priority(),
+                    action.input()
+                );
+                log.info("Created {} task from plan: {}", taskType, action.description());
+            }
+        }
 
         var pendingTasks = taskService.getPendingTasks();
         for (var task : pendingTasks) {
@@ -271,29 +169,10 @@ public class DefaultAgentRuntime implements AgentRuntime {
                 taskService.startTask(task.taskId().value());
                 var tool = toolRegistry.findByName(task.taskType().name());
                 if (tool.isPresent()) {
-                    Map<String, Object> taskInput = task.input() != null ? task.input() : Map.of();
-                    var enrichedInput = new LinkedHashMap<String, Object>(taskInput);
+                    Map<String, Object> taskInput = task.input() != null ? task.input() : Collections.emptyMap();
+                    var enrichedInput = new LinkedHashMap<>(taskInput);
 
-                    if (task.taskType() == TaskType.DISCOVER_JOBS) {
-                        enrichedInput.putIfAbsent("query", mission.targetRole());
-                        enrichedInput.putIfAbsent("location", mission.targetLocation());
-                        enrichedInput.putIfAbsent("skills", String.join(", ", mission.preferredSkills()));
-                    }
-
-                    if (task.taskType() == TaskType.DISCOVER_JOBS && enrichedInput.containsKey("board")) {
-                        enrichedInput.putIfAbsent("query", mission.targetRole());
-                        enrichedInput.putIfAbsent("location", mission.targetLocation());
-                    }
-
-                    if (task.taskType() == TaskType.SUBMIT_APPLICATION) {
-                        enrichedInput.putIfAbsent("userId", mission.userId());
-                    }
-
-                    if (task.taskType() == TaskType.TAILOR_RESUME
-                            || task.taskType() == TaskType.GENERATE_COVER_LETTER
-                            || task.taskType() == TaskType.RANK_JOB) {
-                        enrichedInput.putIfAbsent("userId", mission.userId());
-                    }
+                    enrichTaskInput(mission, task, enrichedInput);
 
                     var result = tool.get().execute(enrichedInput);
 
@@ -308,6 +187,18 @@ public class DefaultAgentRuntime implements AgentRuntime {
 
                     taskService.completeTask(task.taskId().value(), result);
                     log.info("Task {} completed with result: {}", task.taskId(), result);
+
+                    if (task.taskType() == TaskType.SUBMIT_APPLICATION) {
+                        mission.incrementApplicationsSubmitted();
+                        var state = brain.getOrCreateState(mission.userId());
+                        state.incrementApplications();
+                    }
+
+                    var reflection = brain.reflect(mission.userId(), task, result);
+                    if (!reflection.success()) {
+                        mission.incrementRejected();
+                    }
+
                 } else {
                     taskService.failTask(task.taskId().value(), "Tool not found: " + task.taskType().name());
                 }
@@ -315,6 +206,26 @@ public class DefaultAgentRuntime implements AgentRuntime {
                 log.error("Task {} failed: {}", task.taskId(), e.getMessage());
                 taskService.failTask(task.taskId().value(), e.getMessage());
             }
+        }
+    }
+
+    private void enrichTaskInput(Mission mission, AgentTask task, LinkedHashMap<String, Object> input) {
+        if (task.taskType() == TaskType.DISCOVER_JOBS) {
+            input.putIfAbsent("query", mission.targetRole());
+            input.putIfAbsent("location", mission.targetLocation());
+            input.putIfAbsent("skills", String.join(", ", mission.preferredSkills()));
+        }
+
+        if (task.taskType() == TaskType.DISCOVER_JOBS && input.containsKey("board")) {
+            input.putIfAbsent("query", mission.targetRole());
+            input.putIfAbsent("location", mission.targetLocation());
+        }
+
+        if (task.taskType() == TaskType.SUBMIT_APPLICATION
+                || task.taskType() == TaskType.TAILOR_RESUME
+                || task.taskType() == TaskType.GENERATE_COVER_LETTER
+                || task.taskType() == TaskType.RANK_JOB) {
+            input.putIfAbsent("userId", mission.userId());
         }
     }
 
@@ -326,58 +237,39 @@ public class DefaultAgentRuntime implements AgentRuntime {
         }
     }
 
-    private void learn(Mission mission) {
-        log.debug("Learning from mission {}", mission.missionId());
-        var tasks = taskService.getMissionTasks(mission.missionId().value());
+    private void checkEmails(Mission mission) {
+        try {
+            var tool = toolRegistry.findByName("MONITOR_EMAILS");
+            if (tool.isEmpty()) return;
 
-        var completedApplyTasks = tasks.stream()
-            .filter(t -> t.taskType() == TaskType.SUBMIT_APPLICATION && t.status() == TaskStatus.COMPLETED)
-            .toList();
+            var missionTasks = taskService.getMissionTasks(mission.missionId().value());
+            var completedApps = missionTasks.stream()
+                .filter(t -> t.taskType() == TaskType.SUBMIT_APPLICATION
+                    && t.status() == TaskStatus.COMPLETED)
+                .count();
 
-        var failedApplyTasks = tasks.stream()
-            .filter(t -> t.taskType() == TaskType.SUBMIT_APPLICATION && t.status() == TaskStatus.FAILED)
-            .toList();
-
-        if (!completedApplyTasks.isEmpty() || !failedApplyTasks.isEmpty()) {
-            var total = completedApplyTasks.size() + failedApplyTasks.size();
-            var successRate = total > 0 ? (double) completedApplyTasks.size() / total : 0.0;
-
-            memoryService.store(
-                mission.userId(),
-                MemoryType.SUCCESS_RATE,
-                "mission:" + mission.missionId().value(),
-                String.format("{\"successRate\":%.2f,\"applied\":%d,\"failed\":%d}",
-                    successRate, completedApplyTasks.size(), failedApplyTasks.size())
-            );
-        }
-
-        for (var task : completedApplyTasks) {
-            if (task.output() != null && task.output().containsKey("company")) {
-                var company = (String) task.output().get("company");
-                if (company != null && !company.isBlank()) {
-                    memoryService.store(
-                        mission.userId(),
-                        MemoryType.APPLIED_COMPANY,
-                        company.toLowerCase(),
-                        "Applied via mission " + mission.missionId().value()
-                    );
-                }
+            if (completedApps > 0) {
+                var input = new LinkedHashMap<String, Object>();
+                input.put("userId", mission.userId());
+                input.put("maxEmails", 20);
+                var result = tool.get().execute(input);
+                log.info("Email check: {} signals found", result.getOrDefault("signalsFound", 0));
             }
+        } catch (Exception e) {
+            log.debug("Email check skipped: {}", e.getMessage());
         }
+    }
 
-        for (var task : failedApplyTasks) {
-            if (task.output() != null && task.output().containsKey("company")) {
-                var company = (String) task.output().get("company");
-                if (company != null && !company.isBlank()) {
-                    memoryService.store(
-                        mission.userId(),
-                        MemoryType.REJECTED_COMPANY,
-                        company.toLowerCase(),
-                        "Failed to apply: " + (task.errorMessage() != null ? task.errorMessage() : "unknown")
-                    );
-                }
-            }
-        }
+    private TaskType inferTaskType(String actionType) {
+        return switch (actionType.toUpperCase()) {
+            case "SEARCH_JOBS" -> TaskType.DISCOVER_JOBS;
+            case "APPLY_TO_JOBS" -> TaskType.SUBMIT_APPLICATION;
+            case "TAILOR_RESUME" -> TaskType.TAILOR_RESUME;
+            case "NOTIFY_USER" -> TaskType.SEND_NOTIFICATION;
+            case "PREPARE_INTERVIEW" -> TaskType.DISCOVER_JOBS;
+            case "CHECK_EMAIL" -> TaskType.DISCOVER_JOBS;
+            default -> TaskType.DISCOVER_JOBS;
+        };
     }
 
     @Override
@@ -434,6 +326,14 @@ public class DefaultAgentRuntime implements AgentRuntime {
         status.put("mission", mission);
         status.put("tasks", tasks);
         status.put("isRunning", runningMissions.getOrDefault(missionId, false));
+
+        var state = brain.getOrCreateState(mission.userId());
+        status.put("briefing", brain.generateBriefing(mission.userId()));
+        status.put("totalApplications", state.totalApplicationsSubmitted());
+        status.put("totalInterviews", state.totalInterviewsScheduled());
+        status.put("consecutiveFailures", state.consecutiveFailures());
+        status.put("currentPlan", state.currentPlan().toPromptContext());
+
         return status;
     }
 
@@ -444,80 +344,5 @@ public class DefaultAgentRuntime implements AgentRuntime {
         status.put("activeMissions", runningMissions.size());
         status.put("runningMissions", new ArrayList<>(runningMissions.keySet()));
         return status;
-    }
-
-    private Map<String, Object> scoreJob(Mission mission, String jobTitle, String company, String description) {
-        try {
-            var tool = toolRegistry.findByName("RANK_JOB");
-            if (tool.isEmpty()) return null;
-            var input = new LinkedHashMap<String, Object>();
-            input.put("title", jobTitle);
-            input.put("company", company);
-            input.put("description", description);
-            input.put("userId", mission.userId());
-            return tool.get().execute(input);
-        } catch (Exception e) {
-            log.warn("Job scoring failed for {} at {}: {}", jobTitle, company, e.getMessage());
-            return null;
-        }
-    }
-
-    private Map<String, Object> tailorResume(Mission mission, String jobTitle, String company, String description) {
-        try {
-            var tool = toolRegistry.findByName("TAILOR_RESUME");
-            if (tool.isEmpty()) return null;
-            var input = new LinkedHashMap<String, Object>();
-            input.put("title", jobTitle);
-            input.put("company", company);
-            input.put("description", description);
-            input.put("userId", mission.userId());
-            return tool.get().execute(input);
-        } catch (Exception e) {
-            log.warn("Resume tailoring failed for {} at {}: {}", jobTitle, company, e.getMessage());
-            return null;
-        }
-    }
-
-    private Map<String, Object> generateCoverLetter(Mission mission, String jobTitle, String company, String description) {
-        try {
-            var tool = toolRegistry.findByName("GENERATE_COVER_LETTER");
-            if (tool.isEmpty()) return null;
-            var input = new LinkedHashMap<String, Object>();
-            input.put("title", jobTitle);
-            input.put("company", company);
-            input.put("description", description);
-            input.put("userId", mission.userId());
-            return tool.get().execute(input);
-        } catch (Exception e) {
-            log.warn("Cover letter generation failed for {} at {}: {}", jobTitle, company, e.getMessage());
-            return null;
-        }
-    }
-
-    private void checkEmails(Mission mission) {
-        try {
-            var tool = toolRegistry.findByName("MONITOR_EMAILS");
-            if (tool.isEmpty()) return;
-
-            var missionTasks = taskService.getMissionTasks(mission.missionId().value());
-            var hasEmailTask = missionTasks.stream()
-                .anyMatch(t -> t.taskType() == TaskType.SEND_NOTIFICATION
-                    && t.status() == TaskStatus.COMPLETED);
-
-            var completedApps = missionTasks.stream()
-                .filter(t -> t.taskType() == TaskType.SUBMIT_APPLICATION
-                    && t.status() == TaskStatus.COMPLETED)
-                .count();
-
-            if (completedApps > 0) {
-                var input = new LinkedHashMap<String, Object>();
-                input.put("userId", mission.userId());
-                input.put("maxEmails", 20);
-                var result = tool.get().execute(input);
-                log.info("Email check: {}", result.getOrDefault("signalsFound", 0));
-            }
-        } catch (Exception e) {
-            log.debug("Email check skipped: {}", e.getMessage());
-        }
     }
 }

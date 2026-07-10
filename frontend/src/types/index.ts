@@ -397,3 +397,88 @@ export interface AdminMetrics {
   monthlyApiUsage: number;
   newUsersThisMonth: number;
 }
+
+// Agent Intelligence Types
+export interface AgentBriefing {
+  briefing: string;
+  totalApplications: number;
+  totalInterviews: number;
+  consecutiveFailures: number;
+  currentPlan: string;
+  latestWeeklyReview: string;
+}
+
+export interface AgentMissionStatus {
+  mission: MissionResponse;
+  tasks: TaskResponse[];
+  isRunning: boolean;
+  briefing: string;
+  totalApplications: number;
+  totalInterviews: number;
+  consecutiveFailures: number;
+  currentPlan: string;
+}
+
+export interface MissionResponse {
+  id: string;
+  userId: string;
+  title: string;
+  targetRole: string;
+  targetLocation: string | null;
+  salaryMin: number | null;
+  salaryMax: number | null;
+  currency: string;
+  preferredCompanies: string[];
+  avoidCompanies: string[];
+  preferredSkills: string[];
+  experienceLevel: string;
+  employmentType: string;
+  dailyApplicationLimit: number;
+  deadlineDays: number;
+  status: 'CREATED' | 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED' | 'FAILED';
+  startedAt: string | null;
+  completedAt: string | null;
+  deadlineAt: string | null;
+  totalJobsFound: number;
+  totalApplicationsSubmitted: number;
+  totalRejected: number;
+  totalPending: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskResponse {
+  id: string;
+  missionId: string;
+  userId: string;
+  taskType: string;
+  status: string;
+  priority: number;
+  description: string;
+  errorMessage: string | null;
+  retryCount: number;
+  maxRetries: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface AIRecommendation {
+  title: string;
+  description: string;
+  reason: string;
+  confidence: number;
+  expectedImpact: 'High' | 'Medium' | 'Low';
+  actionLabel: string;
+  actionHref: string;
+}
+
+export type AgentActivityType = 'searching' | 'analyzing' | 'preparing' | 'waiting' | 'learning' | 'applying' | 'reflecting';
+
+export interface AgentActivity {
+  type: AgentActivityType;
+  label: string;
+  detail: string;
+  timestamp: string;
+  active: boolean;
+}
