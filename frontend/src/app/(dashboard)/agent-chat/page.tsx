@@ -1,28 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Sparkles, ArrowUp, User, Clock } from 'lucide-react';
 import { useAuth } from '@/lib/auth/AuthProvider';
-import { agentPost, API } from '@/lib/api/agent-client';
-import { useWebSocket } from '@/lib/hooks/useWebSocket';
-import {
-  Send,
-  Bot,
-  User,
-  Sparkles,
-  Zap,
-  ArrowUp,
-  Mic,
-  Briefcase,
-  FileText,
-  Search,
-  TrendingUp,
-  Wifi,
-  WifiOff,
-} from 'lucide-react';
+import { apiPost } from '@/lib/api/client';
+import { API } from '@/lib/api/endpoints';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { cn } from '@/lib/utils/cn';
 
 interface Message {
   id: string;
@@ -31,233 +15,345 @@ interface Message {
   timestamp: Date;
 }
 
+function Markdown({ text }: { text: string }) {
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.startsWith('```')) {
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      elements.push(
+        <pre key={`cb-${i}`} className="my-2 overflow-x-auto rounded-lg bg-muted/60 p-3 text-xs leading-relaxed font-mono">
+          <code>{codeLines.join('\n')}</code>
+        </pre>
+      );
+      continue;
+    }
+
+    if (line.trim() === '') continue;
+
+    if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
+      const items: React.ReactNode[] = [];
+      while (i < lines.length && (lines[i].trim().startsWith('- ') || lines[i].trim().startsWith('* '))) {
+        items.push(
+          <li key={`li-${i}`} className="text-sm leading-relaxed text-foreground/85">
+            {renderInline(lines[i].trim().slice(2))}
+          </li>
+        );
+        i++;
+      }
+      elements.push(<ul key={`ul-${i}`} className="my-1 list-disc pl-5 space-y-0.5">{items}</ul>);
+      i--;
+      continue;
+    }
+
+    if (/^\d+[.)]\s/.test(line.trim())) {
+      elements.push(
+        <ol key={`ol-${i}`} className="my-1 list-decimal pl-5">
+          <li className="text-sm leading-relaxed text-foreground/85">
+            {renderInline(line.trim().replace(/^\d+[.)]\s/, ''))}
+          </li>
+        </ol>
+      );
+      continue;
+    }
+
+    elements.push(
+      <p key={`p-${i}`} className="text-sm leading-relaxed text-foreground/85">
+        {renderInline(line)}
+      </p>
+    );
+  }
+
+  return <>{elements}</>;
+}
+
+function renderInline(text: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  let remaining = text;
+  let idx = 0;
+
+  while (remaining.length > 0) {
+    const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
+    const codeMatch = remaining.match(/`([^`]+)`/);
+
+    let firstMatch: RegExpMatchArray | null = null;
+    let firstType: 'bold' | 'code' | null = null;
+    let firstIndex = Infinity;
+
+    if (boldMatch && boldMatch.index! < firstIndex) {
+      firstMatch = boldMatch;
+      firstType = 'bold';
+      firstIndex = boldMatch.index!;
+    }
+    if (codeMatch && codeMatch.index! < firstIndex) {
+      firstMatch = codeMatch;
+      firstType = 'code';
+      firstIndex = codeMatch.index!;
+    }
+
+    if (!firstMatch) {
+      parts.push(<span key={`t-${idx}`}>{remaining}</span>);
+      break;
+    }
+
+    if (firstIndex > 0) {
+      parts.push(<span key={`t-${idx}-pre`}>{remaining.slice(0, firstIndex)}</span>);
+    }
+
+    if (firstType === 'bold') {
+      parts.push(<strong key={`b-${idx}`} className="font-semibold">{firstMatch[1]}</strong>);
+      remaining = remaining.slice(firstIndex + firstMatch[0].length);
+    } else {
+      parts.push(
+        <code key={`c-${idx}`} className="rounded bg-muted/60 px-1.5 py-0.5 text-xs font-mono text-primary">
+          {firstMatch[1]}
+        </code>
+      );
+      remaining = remaining.slice(firstIndex + firstMatch[0].length);
+    }
+    idx++;
+  }
+
+  return parts.length > 0 ? parts : text;
+}
+
 export default function AgentChat() {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
-  const { connected } = useWebSocket({
-    url: `ws://localhost:8080/ws/automation`,
-    topics: ['agent-status', 'mission-update'],
-    onMessage: (msg) => {
-      if (msg.type === 'agent-status' || msg.type === 'mission-update') {
-        const agentMessage: Message = {
-          id: `ws-${Date.now()}`,
-          role: 'agent',
-          content: typeof msg.data.message === 'string' ? msg.data.message : JSON.stringify(msg.data),
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, agentMessage]);
-      }
-    },
-  });
+  const scrollToBottom = useCallback(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    scrollToBottom();
+  }, [messages, isTyping, scrollToBottom]);
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+  const sendMessage = useCallback(async () => {
+    const text = input.trim();
+    if (!text || isTyping) return;
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
+    const userMsg: Message = {
+      id: `user-${Date.now()}`,
       role: 'user',
-      content: input,
+      content: text,
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setIsTyping(true);
+    setError(null);
 
     try {
-      const data = await agentPost<{ response: string }>(API.agent.chat, {
-        userId: user?.id || '',
-        message: input,
+      if (inputRef.current) {
+        inputRef.current.style.height = 'auto';
+      }
+
+      const res = await apiPost<{ response: string; type: string }>(API.agent.chat, {
+        userId: user?.id ?? '',
+        message: text,
       });
-      const agentMessage: Message = {
-        id: (Date.now() + 1).toString(),
+
+      const agentMsg: Message = {
+        id: `agent-${Date.now()}`,
         role: 'agent',
-        content: data.response,
+        content: res.data.response,
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, agentMessage]);
-    } catch (error) {
-      console.error('Failed to send message:', error);
+      setMessages((prev) => [...prev, agentMsg]);
+    } catch {
+      setError('Something went wrong. Please try again.');
     } finally {
       setIsTyping(false);
     }
-  };
+  }, [input, isTyping, user?.id]);
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      formRef.current?.requestSubmit();
     }
   };
 
-  const quickActions = [
-    { label: 'Find remote Java jobs', icon: Search, color: 'text-primary' },
-    { label: 'Score my resume', icon: TrendingUp, color: 'text-success' },
-    { label: 'Generate cover letter', icon: FileText, color: 'text-warning' },
-    { label: 'Practice interview', icon: Mic, color: 'text-info' },
-    { label: 'Research company', icon: Briefcase, color: 'text-primary' },
-    { label: 'Pause agent', icon: Zap, color: 'text-destructive' },
-  ];
+  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border/50 px-6 py-4">
+    <div className="flex h-[calc(100dvh-4rem)] flex-col bg-background">
+      <header className="flex items-center justify-between border-b border-border/40 px-6 py-3">
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-primary shadow-glow">
-              <Bot className="h-5 w-5 text-white" />
-            </div>
-            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-success border-2 border-background" />
-          </div>
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-gradient-primary">
+              <Sparkles className="h-4 w-4 text-white" />
+            </AvatarFallback>
+          </Avatar>
           <div>
-            <h1 className="text-lg font-bold">Agent Chat</h1>
-            <p className="text-xs text-muted-foreground">AI Job Agent • Always online</p>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold">JobPilot AI</span>
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">BOT</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
+              </span>
+              <span className="text-[11px] text-muted-foreground">Online</span>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          {connected ? (
-            <>
-              <Wifi className="h-3.5 w-3.5 text-success animate-pulse" />
-              <span className="text-success">Live</span>
-            </>
+      </header>
+
+      <div className="flex-1 overflow-y-auto scrollbar-premium">
+        <div className="mx-auto max-w-3xl px-4 py-6">
+          {messages.length === 0 && !isTyping ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-primary shadow-glow">
+                <Sparkles className="h-7 w-7 text-white" />
+              </div>
+              <h2 className="mb-1 text-lg font-semibold">Ask me anything about your job search</h2>
+              <p className="max-w-sm text-sm text-muted-foreground">
+                I can help find jobs, tailor resumes, write cover letters, and more.
+              </p>
+            </div>
           ) : (
-            <>
-              <WifiOff className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>Offline</span>
-            </>
-          )}
-          <span className="text-border">|</span>
-          <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
-          <span>Powered by Ollama</span>
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-hidden">
-        <ScrollArea className="h-full" ref={scrollRef}>
-          <div className="space-y-4 p-6">
-            {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-primary shadow-glow-lg animate-float">
-                  <Bot className="h-10 w-10 text-white" />
-                </div>
-                <h2 className="text-2xl font-bold mb-2">What can I help with?</h2>
-                <p className="text-muted-foreground max-w-md">
-                  I can find jobs, tailor your resume, write cover letters, prepare you for interviews,
-                  and automate applications.
-                </p>
-              </div>
-            )}
-
-            {messages.map((message, i) => (
-              <div
-                key={message.id}
-                className={`flex animate-fade-in ${
-                  message.role === 'user' ? 'justify-end' : 'justify-start'
-                }`}
-              >
-                {message.role === 'agent' && (
-                  <div className="mr-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 mt-1">
-                    <Bot className="h-4 w-4 text-primary" />
-                  </div>
-                )}
+            <div className="space-y-5">
+              {messages.map((msg) => (
                 <div
-                  className={`max-w-[75%] rounded-2xl px-4 py-3 ${
-                    message.role === 'user'
-                      ? 'bg-gradient-primary text-white'
-                      : 'glass border border-border/50'
-                  }`}
+                  key={msg.id}
+                  className={cn(
+                    'flex animate-fade-in gap-3',
+                    msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+                  )}
                 >
-                  <p className="text-sm leading-relaxed">{message.content}</p>
-                  <p className={`text-[10px] mt-1.5 ${
-                    message.role === 'user' ? 'text-white/60' : 'text-muted-foreground'
-                  }`}>
-                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
-                {message.role === 'user' && (
-                  <div className="ml-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted mt-1">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                )}
-              </div>
-            ))}
+                  {msg.role === 'agent' ? (
+                    <Avatar className="mt-0.5 h-8 w-8 shrink-0">
+                      <AvatarFallback className="bg-gradient-primary">
+                        <Sparkles className="h-4 w-4 text-white" />
+                      </AvatarFallback>
+                    </Avatar>
+                  ) : (
+                    <Avatar className="mt-0.5 h-8 w-8 shrink-0">
+                      <AvatarFallback className="bg-muted text-muted-foreground">
+                        <User className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
 
-            {isTyping && (
-              <div className="flex animate-fade-in justify-start">
-                <div className="mr-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 mt-1">
-                  <Bot className="h-4 w-4 text-primary" />
-                </div>
-                <div className="glass rounded-2xl border border-border/50 px-4 py-3">
-                  <div className="flex items-center gap-1.5">
-                    <span className="typing-dot h-2 w-2 rounded-full bg-primary" />
-                    <span className="typing-dot h-2 w-2 rounded-full bg-primary" />
-                    <span className="typing-dot h-2 w-2 rounded-full bg-primary" />
+                  <div className={cn('flex min-w-0 flex-col', msg.role === 'user' ? 'items-end' : 'items-start')}>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-xs font-medium text-foreground/70">
+                        {msg.role === 'agent' ? 'JobPilot AI' : 'You'}
+                      </span>
+                      {msg.role === 'agent' && (
+                        <span className="rounded bg-primary/10 px-1 py-0.5 text-[10px] font-medium text-primary leading-none">
+                          BOT
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground/60">
+                        <Clock className="h-3 w-3" />
+                        {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+
+                    <div
+                      className={cn(
+                        'rounded-2xl px-4 py-2.5',
+                        msg.role === 'user'
+                          ? 'bg-primary text-primary-foreground rounded-tr-md'
+                          : 'bg-muted/40 text-foreground rounded-tl-md border border-border/30'
+                      )}
+                    >
+                      {msg.role === 'agent' ? (
+                        <Markdown text={msg.content} />
+                      ) : (
+                        <p className="text-sm leading-relaxed">{msg.content}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        </ScrollArea>
+              ))}
+
+              {isTyping && (
+                <div className="flex animate-fade-in gap-3">
+                  <Avatar className="mt-0.5 h-8 w-8 shrink-0">
+                    <AvatarFallback className="bg-gradient-primary">
+                      <Sparkles className="h-4 w-4 text-white" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex min-w-0 flex-col">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-xs font-medium text-foreground/70">JobPilot AI</span>
+                      <span className="rounded bg-primary/10 px-1 py-0.5 text-[10px] font-medium text-primary leading-none">BOT</span>
+                    </div>
+                    <div className="rounded-2xl rounded-tl-md bg-muted/40 border border-border/30 px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="typing-dot inline-block h-2 w-2 rounded-full bg-foreground/40" />
+                        <span className="typing-dot inline-block h-2 w-2 rounded-full bg-foreground/40" />
+                        <span className="typing-dot inline-block h-2 w-2 rounded-full bg-foreground/40" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {error && (
+                <div className="flex justify-center">
+                  <p className="text-xs text-destructive">{error}</p>
+                </div>
+              )}
+
+              <div ref={bottomRef} />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Quick Actions */}
-      {messages.length === 0 && (
-        <div className="border-t border-border/50 px-6 py-3">
-          <div className="flex flex-wrap gap-2">
-            {quickActions.map((action) => {
-              const Icon = action.icon;
-              return (
-                <Button
-                  key={action.label}
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 glass border-border/50 hover:border-primary/30 hover-lift"
-                  onClick={() => setInput(action.label)}
-                >
-                  <Icon className={`h-3.5 w-3.5 ${action.color}`} />
-                  {action.label}
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Input */}
-      <div className="border-t border-border/50 px-6 py-4">
-        <div className="flex items-center gap-3">
+      <div className="border-t border-border/40 px-4 py-3">
+        <form
+          ref={formRef}
+          onSubmit={(e) => { e.preventDefault(); sendMessage(); }}
+          className="mx-auto flex max-w-3xl items-end gap-2"
+        >
           <div className="relative flex-1">
-            <Input
+            <textarea
               ref={inputRef}
-              placeholder="Tell the agent what to do..."
               value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyPress}
-              className="h-12 rounded-xl border-border/50 bg-muted/30 pl-4 pr-12 text-sm focus:border-primary/50 focus:ring-primary/20"
+              onChange={handleInput}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask me anything..."
+              rows={1}
+              disabled={isTyping}
+              className="w-full resize-none rounded-xl border border-border/50 bg-muted/20 px-4 py-2.5 pr-12 text-sm placeholder:text-muted-foreground/40 focus:border-primary/40 focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:opacity-50"
+              style={{ minHeight: '40px', maxHeight: '120px' }}
             />
           </div>
-          <Button
-            onClick={sendMessage}
-            disabled={isTyping || !input.trim()}
-            size="icon"
-            className="h-12 w-12 rounded-xl bg-gradient-primary hover:opacity-90 shadow-glow transition-all disabled:opacity-50"
+          <button
+            type="submit"
+            disabled={!input.trim() || isTyping}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-primary text-white shadow-glow transition-all hover:opacity-90 disabled:opacity-30 disabled:shadow-none"
           >
-            <ArrowUp className="h-5 w-5" />
-          </Button>
-        </div>
+            <ArrowUp className="h-4 w-4" />
+          </button>
+        </form>
       </div>
     </div>
   );

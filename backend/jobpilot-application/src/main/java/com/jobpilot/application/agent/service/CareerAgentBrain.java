@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -79,6 +80,119 @@ public class CareerAgentBrain {
         storeReflection(userId, reflection);
         storeEpisode(userId, task, reflection);
         return reflection;
+    }
+
+    public void updateAgentSettings(UUID userId, String preferredLocation, Integer salaryMin, Integer salaryMax,
+                                     List<String> preferredCompanies, List<String> avoidCompanies,
+                                     String employmentType, String workAuthorization, String careerGoal,
+                                     List<String> certifications, List<String> projects) {
+        var state = getOrCreateState(userId);
+        var identity = state.identity();
+        if (preferredLocation != null) identity.preferredLocation(preferredLocation);
+        if (salaryMin != null) identity.salaryMin(salaryMin);
+        if (salaryMax != null) identity.salaryMax(salaryMax);
+        if (preferredCompanies != null) identity.preferredCompanies(preferredCompanies);
+        if (avoidCompanies != null) identity.avoidCompanies(avoidCompanies);
+        if (employmentType != null) identity.employmentType(employmentType);
+        if (workAuthorization != null) identity.workAuthorization(workAuthorization);
+        if (careerGoal != null) identity.careerGoal(careerGoal);
+        if (certifications != null) identity.certifications(certifications);
+        if (projects != null) identity.projects(projects);
+    }
+
+    public Map<String, Object> getCareerHealth(UUID userId) {
+        var state = agentStates.get(userId);
+        if (state == null) return Map.of("status", "insufficient_data", "message", "No agent state available.");
+
+        var totalApps = state.totalApplicationsSubmitted();
+        var totalInterviews = state.totalInterviewsScheduled();
+        var failures = state.consecutiveFailures();
+
+        if (totalApps + totalInterviews + failures == 0) {
+            return Map.of("status", "insufficient_data", "message", "Not enough data to calculate career health.");
+        }
+
+        var appScore = Math.min(40, totalApps * 4);
+        var interviewScore = Math.min(30, totalInterviews * 10);
+        var failurePenalty = Math.min(20, failures * 5);
+        var baseScore = 30;
+        var score = Math.max(0, Math.min(100, baseScore + appScore + interviewScore - failurePenalty));
+
+        return Map.of(
+            "status", "available",
+            "score", score,
+            "breakdown", Map.of(
+                "applicationVolume", totalApps,
+                "applicationScore", appScore,
+                "interviewScore", interviewScore,
+                "failurePenalty", failurePenalty,
+                "baseScore", baseScore
+            )
+        );
+    }
+
+    public List<Map<String, Object>> getRecommendations(UUID userId) {
+        var state = agentStates.get(userId);
+        if (state == null) return List.of();
+
+        var reviews = weeklyReviews.getOrDefault(userId, List.of());
+        if (reviews.isEmpty()) return List.of();
+
+        var latest = reviews.get(reviews.size() - 1);
+        if (latest.recommendations().isEmpty()) return List.of();
+
+        return latest.recommendations().stream()
+            .map(r -> {
+                var m = new java.util.LinkedHashMap<String, Object>();
+                m.put("title", r.length() > 60 ? r.substring(0, 57) + "..." : r);
+                m.put("description", r);
+                m.put("reason", "Based on your weekly review and recent agent reflections.");
+                m.put("confidence", latest.metrics().getOrDefault("avgMatchScore", 0.0).intValue());
+                m.put("expectedImpact", latest.metrics().getOrDefault("successRate", 0.0) > 0.5 ? "High" : "Medium");
+                return m;
+            })
+            .limit(5)
+            .map(m -> (Map<String, Object>) m)
+            .toList();
+    }
+
+    public List<Map<String, Object>> getRequiresAttention(UUID userId) {
+        var items = new java.util.ArrayList<Map<String, Object>>();
+
+        var recentEps = getRecentEpisodes(userId, 50);
+        for (var ep : recentEps) {
+            var ctxContainsCaptcha = ep.context().values().stream()
+                .anyMatch(v -> v instanceof String s && s.toLowerCase().contains("captcha"));
+            if (ctxContainsCaptcha) {
+                items.add(Map.of(
+                    "type", "captcha",
+                    "message", "CAPTCHA detected — manual intervention required.",
+                    "detail", ep.narrative(),
+                    "timestamp", ep.occurredAt().toString()
+                ));
+            }
+            if (!ep.success() && ep.lessons() != null && ep.lessons().stream().anyMatch(l -> l.contains("interview"))) {
+                items.add(Map.of(
+                    "type", "interview",
+                    "message", "Interview invitation detected.",
+                    "detail", ep.narrative(),
+                    "timestamp", ep.occurredAt().toString()
+                ));
+            }
+        }
+
+        // Check for consecutive failures
+        var state = agentStates.get(userId);
+        if (state != null && state.consecutiveFailures() >= 3) {
+            items.add(Map.of(
+                "type", "failure_warning",
+                "message", state.consecutiveFailures() + " consecutive application failures.",
+                "detail", "The AI may need adjusted targeting or resume improvements.",
+                "timestamp", Instant.now().toString()
+            ));
+        }
+
+        return items;
     }
 
     public Optional<WeeklyReview> weeklyReview(UUID userId) {
@@ -593,6 +707,9 @@ public class CareerAgentBrain {
         if (candidateProfile.desiredLocation() != null) identity.preferredLocation(candidateProfile.desiredLocation());
         if (candidateProfile.salaryExpectationMin() != null) identity.salaryMin(candidateProfile.salaryExpectationMin());
         if (candidateProfile.salaryExpectationMax() != null) identity.salaryMax(candidateProfile.salaryExpectationMax());
+        if (candidateProfile.certifications() != null) identity.certifications(candidateProfile.certifications());
+        if (candidateProfile.employmentType() != null) identity.employmentType(candidateProfile.employmentType());
+        if (candidateProfile.workPreference() != null) identity.workAuthorization(candidateProfile.workPreference());
 
         if (candidateProfile.experience() != null) {
             identity.experience(candidateProfile.experience().stream()

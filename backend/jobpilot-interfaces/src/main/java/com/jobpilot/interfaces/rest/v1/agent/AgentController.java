@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -116,6 +117,48 @@ public class AgentController {
         ));
     }
 
+    @GetMapping("/recommendations")
+    public ResponseEntity<List<Map<String, Object>>> getRecommendations(@RequestParam UUID userId) {
+        return ResponseEntity.ok(careerAgentBrain.getRecommendations(userId));
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, Object>> getCareerHealth(@RequestParam UUID userId) {
+        return ResponseEntity.ok(careerAgentBrain.getCareerHealth(userId));
+    }
+
+    @GetMapping("/attention")
+    public ResponseEntity<List<Map<String, Object>>> getRequiresAttention(@RequestParam UUID userId) {
+        return ResponseEntity.ok(careerAgentBrain.getRequiresAttention(userId));
+    }
+
+    @PutMapping("/settings")
+    public ResponseEntity<Map<String, Object>> updateAgentSettings(
+            @RequestParam UUID userId,
+            @RequestBody Map<String, Object> body) {
+        careerAgentBrain.updateAgentSettings(userId,
+            (String) body.get("preferredLocation"),
+            body.get("salaryMin") != null ? ((Number) body.get("salaryMin")).intValue() : null,
+            body.get("salaryMax") != null ? ((Number) body.get("salaryMax")).intValue() : null,
+            castStringList(body.get("preferredCompanies")),
+            castStringList(body.get("avoidCompanies")),
+            (String) body.get("employmentType"),
+            (String) body.get("workAuthorization"),
+            (String) body.get("careerGoal"),
+            castStringList(body.get("certifications")),
+            castStringList(body.get("projects"))
+        );
+        return ResponseEntity.ok(Map.of("status", "ok"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> castStringList(Object value) {
+        if (value instanceof List<?> list) {
+            return (List<String>) list;
+        }
+        return null;
+    }
+
     @PostMapping("/missions/{missionId}/start")
     public ResponseEntity<MissionResponse> startMission(@PathVariable UUID missionId) {
         agentRuntime.startMission(missionId);
@@ -175,8 +218,10 @@ public class AgentController {
     }
 
     @GetMapping("/status")
-    public ResponseEntity<Map<String, Object>> getAgentStatus() {
-        var missions = missionService.getUserMissions(UUID.randomUUID());
+    public ResponseEntity<Map<String, Object>> getAgentStatus(@RequestParam(required = false) UUID userId) {
+        var missions = userId != null
+            ? missionService.getUserMissions(userId)
+            : java.util.Collections.<com.jobpilot.domain.agent.Mission>emptyList();
         var activeMissions = missions.stream()
             .filter(m -> m.status() == MissionStatus.ACTIVE)
             .count();

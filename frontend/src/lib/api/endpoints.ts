@@ -106,6 +106,10 @@ export const API = {
   agent: {
     chat: '/agent/chat',
     status: '/agent/status',
+    recommendations: (userId: string) => `/agent/recommendations?userId=${userId}`,
+    health: (userId: string) => `/agent/health?userId=${userId}`,
+    attention: (userId: string) => `/agent/attention?userId=${userId}`,
+    settings: (userId: string) => `/agent/settings?userId=${userId}`,
     missions: '/agent/missions',
     missionDetail: (id: string) => `/agent/missions/${id}`,
     missionStatus: (id: string) => `/agent/missions/${id}/status`,
