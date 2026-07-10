@@ -93,6 +93,27 @@ export default function DashboardPage() {
       .then(r => setAttention(r.data ?? [])).catch(() => setAttention([]));
   }, [userId]);
 
+  /* ─── Approvals ─── */
+  const [approvals, setApprovals] = useState<{ taskId: string; description: string; taskType: string; createdAt: string }[]>([]);
+  const fetchApprovals = () => {
+    apiGet<{ taskId: string; description: string; taskType: string; createdAt: string }[]>(API.agent.approvals)
+      .then(r => setApprovals(r.data ?? [])).catch(() => setApprovals([]));
+  };
+  useEffect(() => { fetchApprovals(); }, []);
+
+  const handleApprove = async (taskId: string) => {
+    await apiPost(API.agent.approveTask(taskId)); fetchApprovals();
+  };
+  const handleReject = async (taskId: string) => {
+    await apiPost(API.agent.rejectTask(taskId), { reason: 'Rejected by user' }); fetchApprovals();
+  };
+
+  /* ─── Feedback ─── */
+  const [feedbackSent, setFeedbackSent] = useState<Set<string>>(new Set());
+  const handleFeedback = async (taskId: string, positive: boolean) => {
+    await apiPost(API.agent.feedback, { taskId, positive }); setFeedbackSent(prev => new Set(prev).add(taskId));
+  };
+
   /* ─── Mission creation modal ─── */
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ title: '', targetRole: '', targetLocation: '', salaryMin: '', salaryMax: '', skills: '' });
@@ -224,6 +245,29 @@ export default function DashboardPage() {
         </>
       )}
 
+      {/* ─── Pending Approval ─── */}
+      {approvals.length > 0 && (
+        <>
+          <Divider />
+          <Section title="Pending Approval (Mode 2)">
+            <div className="space-y-2">
+              {approvals.map(a => (
+                <div key={a.taskId} className="flex items-center justify-between rounded-lg border border-border/15 bg-muted/15 p-3 text-sm">
+                  <div className="flex-1">
+                    <p className="text-foreground/85">{a.description}</p>
+                    <p className="text-[11px] text-muted-foreground/40">{a.taskType.replace(/_/g, ' ')}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-3">
+                    <button onClick={() => handleApprove(a.taskId)} className="rounded-lg bg-success/10 px-3 py-1.5 text-xs font-medium text-success hover:bg-success/20">Approve</button>
+                    <button onClick={() => handleReject(a.taskId)} className="rounded-lg bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/20">Reject</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        </>
+      )}
+
       {/* ─── Stats ─── */}
       {(briefing && !briefingLoading && (briefing.totalApplications + briefing.totalInterviews + briefing.consecutiveFailures > 0)) && (
         <>
@@ -332,9 +376,18 @@ export default function DashboardPage() {
                       <p className="text-foreground/80">{t.description}</p>
                       <p className="text-[11px] text-muted-foreground/40">{t.taskType.replace(/_/g, ' ')} &middot; {t.startedAt ? new Date(t.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</p>
                     </div>
-                    <span className={`shrink-0 text-[10px] ${t.status === 'COMPLETED' ? 'text-success/70' : t.status === 'FAILED' ? 'text-destructive/70' : 'text-amber-500/70'}`}>
-                      {t.status === 'COMPLETED' ? 'Done' : t.status === 'FAILED' ? 'Failed' : 'In progress'}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className={`text-[10px] ${t.status === 'COMPLETED' ? 'text-success/70' : t.status === 'FAILED' ? 'text-destructive/70' : 'text-amber-500/70'}`}>
+                        {t.status === 'COMPLETED' ? 'Done' : t.status === 'FAILED' ? 'Failed' : 'In progress'}
+                      </span>
+                      {t.status === 'COMPLETED' && !feedbackSent.has(t.id) && (
+                        <div className="flex items-center gap-1 ml-2">
+                          <button onClick={() => handleFeedback(t.id, true)} className="text-muted-foreground/40 hover:text-success transition-colors" title="Good job">&#x1F44D;</button>
+                          <button onClick={() => handleFeedback(t.id, false)} className="text-muted-foreground/40 hover:text-destructive transition-colors" title="Not helpful">&#x1F44E;</button>
+                        </div>
+                      )}
+                      {feedbackSent.has(t.id) && <span className="text-[9px] text-muted-foreground/30 ml-2">&#x2713;</span>}
+                    </div>
                   </div>
                 ))}
             </div>

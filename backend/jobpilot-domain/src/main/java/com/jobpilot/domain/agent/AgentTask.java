@@ -114,6 +114,23 @@ public class AgentTask extends BaseAggregateRoot {
         this.updatedAt = Instant.now();
     }
 
+    public void markAwaitingApproval() {
+        this.status = TaskStatus.AWAITING_APPROVAL;
+        this.updatedAt = Instant.now();
+    }
+
+    public void approve() {
+        this.status = TaskStatus.PENDING;
+        this.updatedAt = Instant.now();
+    }
+
+    public void reject(String reason) {
+        this.status = TaskStatus.CANCELLED;
+        this.errorMessage = reason;
+        this.completedAt = Instant.now();
+        this.updatedAt = Instant.now();
+    }
+
     public void markRunning() {
         this.status = TaskStatus.RUNNING;
         this.startedAt = Instant.now();

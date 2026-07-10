@@ -151,6 +151,43 @@ public class AgentController {
         return ResponseEntity.ok(Map.of("status", "ok"));
     }
 
+    @GetMapping("/approvals")
+    public ResponseEntity<List<Map<String, Object>>> getApprovals() {
+        var tasks = taskService.getAwaitingApprovalTasks();
+        var result = tasks.stream().map(t -> {
+            var m = new java.util.LinkedHashMap<String, Object>();
+            m.put("taskId", t.taskId().value().toString());
+            m.put("missionId", t.missionId().toString());
+            m.put("description", t.description());
+            m.put("taskType", t.taskType().name());
+            m.put("createdAt", t.createdAt().toString());
+            return m;
+        }).toList();
+        return ResponseEntity.ok(result.stream().map(m -> (Map<String, Object>) m).toList());
+    }
+
+    @PostMapping("/approvals/{taskId}/approve")
+    public ResponseEntity<Map<String, Object>> approveTask(@PathVariable UUID taskId) {
+        taskService.approveTask(taskId);
+        return ResponseEntity.ok(Map.of("status", "approved", "taskId", taskId.toString()));
+    }
+
+    @PostMapping("/approvals/{taskId}/reject")
+    public ResponseEntity<Map<String, Object>> rejectTask(@PathVariable UUID taskId,
+                                                           @RequestBody Map<String, String> body) {
+        taskService.rejectTask(taskId, body.getOrDefault("reason", "Rejected by user"));
+        return ResponseEntity.ok(Map.of("status", "rejected", "taskId", taskId.toString()));
+    }
+
+    @PostMapping("/feedback")
+    public ResponseEntity<Map<String, Object>> submitFeedback(@RequestBody Map<String, Object> body) {
+        var taskId = UUID.fromString((String) body.get("taskId"));
+        var positive = Boolean.TRUE.equals(body.get("positive"));
+        var comment = (String) body.get("comment");
+        taskService.storeFeedback(taskId, positive, comment);
+        return ResponseEntity.ok(Map.of("status", "feedback_recorded"));
+    }
+
     @SuppressWarnings("unchecked")
     private List<String> castStringList(Object value) {
         if (value instanceof List<?> list) {

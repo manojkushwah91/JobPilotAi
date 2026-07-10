@@ -98,4 +98,40 @@ public class AgentTaskService {
         }
         return task;
     }
+
+    public List<AgentTask> getAwaitingApprovalTasks() {
+        return taskRepository.findByStatus(TaskStatus.AWAITING_APPROVAL);
+    }
+
+    public AgentTask approveTask(UUID taskId) {
+        var task = getTask(taskId);
+        task.approve();
+        taskRepository.save(task);
+        log.info("Approved task {}", taskId);
+        return task;
+    }
+
+    public AgentTask rejectTask(UUID taskId, String reason) {
+        var task = getTask(taskId);
+        task.reject(reason);
+        taskRepository.save(task);
+        log.info("Rejected task {}: {}", taskId, reason);
+        return task;
+    }
+
+    public AgentTask storeFeedback(UUID taskId, boolean positive, String comment) {
+        var task = getTask(taskId);
+        var existing = task.input() != null ? new java.util.LinkedHashMap<>(task.input()) : new java.util.LinkedHashMap<String, Object>();
+        existing.put("_feedback_positive", positive);
+        if (comment != null && !comment.isBlank()) existing.put("_feedback_comment", comment);
+        var newInput = java.util.Collections.unmodifiableMap(existing);
+        var output = task.output() != null ? new java.util.LinkedHashMap<>(task.output()) : new java.util.LinkedHashMap<String, Object>();
+        output.put("feedbackReceived", true);
+        output.put("feedbackPositive", positive);
+        if (comment != null && !comment.isBlank()) output.put("feedbackComment", comment);
+        task.complete(output);
+        taskRepository.save(task);
+        log.info("Feedback stored for task {}: positive={}", taskId, positive);
+        return task;
+    }
 }
