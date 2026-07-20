@@ -41,7 +41,7 @@
 
         <!-- Database -->
         <flyway.version>10.20.0</flyway.version>
-        <pgvector.version>0.1.5</pgvector.version>
+        <pgvector.version>0.1.6</pgvector.version>
 
         <!-- Observability -->
         <micrometer.version>1.13.6</micrometer.version>
